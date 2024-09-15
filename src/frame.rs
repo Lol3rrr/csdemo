@@ -1,0 +1,91 @@
+pub struct Frame<'b> {
+    pub cmd: crate::DemoCommand,
+    pub tick: i32,
+    pub compressed: bool,
+    pub inner: std::borrow::Cow<'b, [u8]>,
+}
+
+impl<'b> Frame<'b> {
+    pub fn parse<'ib>(input: &'ib [u8]) -> Result<(&'ib [u8], Self), ()>
+    where
+        'ib: 'b,
+    {
+        let (input, raw_cmd) = crate::varint::parse_varint(input)?;
+        let (input, tick) = crate::varint::parse_varint(input)?;
+        let (input, size) = crate::varint::parse_varint(input)?;
+
+        if input.len() < size as usize {
+            return Err(());
+        }
+
+        let demo_cmd = crate::DemoCommand::try_from((raw_cmd & !64) as i32).map_err(|e| ())?;
+
+        Ok((
+            &input[size as usize..],
+            Self {
+                tick: tick as i32,
+                cmd: demo_cmd,
+                compressed: (raw_cmd & 64) == 64,
+                inner: std::borrow::Cow::Borrowed(&input[..size as usize]),
+            },
+        ))
+    }
+
+    pub fn data(&self) -> Option<&[u8]> {
+        if self.compressed {
+            return None;
+        }
+
+        Some(self.inner.as_ref())
+    }
+
+    pub fn decompress(&mut self) -> Result<(), ()> {
+        if !self.compressed {
+            return Ok(());
+        }
+
+        let decompressed = snap::raw::Decoder::new()
+            .decompress_vec(&self.inner.as_ref())
+            .map_err(|e| ())?;
+
+        self.compressed = false;
+        self.inner = std::borrow::Cow::Owned(decompressed);
+
+        Ok(())
+    }
+}
+
+pub struct FrameIterator<'b> {
+    remaining: &'b [u8],
+}
+
+impl<'b> FrameIterator<'b> {
+    pub fn parse<'ib>(input: &'ib [u8]) -> Self
+    where
+        'ib: 'b,
+    {
+        Self { remaining: input }
+    }
+}
+impl<'b> Iterator for FrameIterator<'b> {
+    type Item = Frame<'b>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining.is_empty() {
+            return None;
+        }
+
+        match Frame::parse(self.remaining) {
+            Ok((rem, frame)) => {
+                self.remaining = rem;
+                Some(frame)
+            }
+            Err(_e) => {
+                // TODO
+                // How do we handle errors?
+                self.remaining = &[];
+                None
+            }
+        }
+    }
+}
