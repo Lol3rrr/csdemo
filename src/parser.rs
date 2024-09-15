@@ -31,6 +31,8 @@ impl From<crate::game_event::ParseGameEventError> for FirstPassError {
 pub struct Player {
     pub xuid: u64,
     pub name: String,
+    pub team: i32,
+    pub color: i32,
 }
 
 #[derive(Debug)]
@@ -86,6 +88,9 @@ where
             DemoCommand::FullPacket => {
                 parse_fullpacket(data, &mut events, &mut event_mapping, &mut player_info)?;
             }
+            // TODO
+            DemoCommand::AnimationData => {}
+            DemoCommand::AnimationHeader => {}
             _ => {}
         }
     }
@@ -249,6 +254,8 @@ fn inner_parse_packet(
                         Player {
                             name: data.name.unwrap(),
                             xuid: data.xuid.unwrap(),
+                            team: data.teamnumber.unwrap(),
+                            color: data.playercolor.unwrap(),
                         },
                     );
                 }
