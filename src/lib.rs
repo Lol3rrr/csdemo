@@ -13,6 +13,7 @@ mod bitreader;
 mod varint;
 
 mod packet;
+pub use packet::DemoEvent;
 pub mod game_event;
 
 pub mod parser;
