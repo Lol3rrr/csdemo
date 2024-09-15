@@ -28,10 +28,17 @@ impl From<crate::game_event::ParseGameEventError> for FirstPassError {
 }
 
 #[derive(Debug)]
+pub struct Player {
+    pub xuid: u64,
+    pub name: String,
+}
+
+#[derive(Debug)]
 pub struct FirstPassOutput {
     pub header: crate::csgo_proto::CDemoFileHeader,
     pub info: crate::csgo_proto::CDemoFileInfo,
     pub events: Vec<DemoEvent>,
+    pub player_info: std::collections::HashMap<i32, Player>,
 }
 
 #[derive(Debug)]
@@ -50,6 +57,7 @@ where
     let mut event_mapping = GameEventMapping {
         mapping: std::collections::HashMap::new(),
     };
+    let mut player_info = std::collections::HashMap::new();
 
     for mut frame in frames.into_iter() {
         frame
@@ -67,10 +75,10 @@ where
                 file_info = Some(raw);
             }
             DemoCommand::SignonPacket | DemoCommand::Packet => {
-                parse_packet(data, &mut events, &mut event_mapping)?;
+                parse_packet(data, &mut events, &mut event_mapping, &mut player_info)?;
             }
             DemoCommand::FullPacket => {
-                parse_fullpacket(data, &mut events, &mut event_mapping)?;
+                parse_fullpacket(data, &mut events, &mut event_mapping, &mut player_info)?;
             }
             _ => {}
         }
@@ -79,13 +87,14 @@ where
     let header = header.ok_or(FirstPassError::MissingFileHeader)?;
     let info = file_info.ok_or(FirstPassError::MissingFileInfo)?;
 
-    Ok(FirstPassOutput { header, info, events })
+    Ok(FirstPassOutput { header, info, events, player_info })
 }
 
 fn parse_fullpacket(
     data: &[u8],
     events: &mut Vec<DemoEvent>,
     event_mapper: &mut GameEventMapping,
+    player_info: &mut std::collections::HashMap<i32, Player>,
 ) -> Result<(), FirstPassError> {
     let raw: crate::csgo_proto::CDemoFullPacket = prost::Message::decode(data)?;
 
@@ -94,7 +103,7 @@ fn parse_fullpacket(
 
     match raw.packet {
         Some(packet) => {
-            inner_parse_packet(&packet, events, event_mapper)?;
+            inner_parse_packet(&packet, events, event_mapper, player_info)?;
 
             Ok(())
         }
@@ -106,10 +115,11 @@ fn parse_packet(
     data: &[u8],
     events: &mut Vec<DemoEvent>,
     event_mapper: &mut GameEventMapping,
+    player_info: &mut std::collections::HashMap<i32, Player>,
 ) -> Result<(), FirstPassError> {
     let raw: crate::csgo_proto::CDemoPacket = prost::Message::decode(data)?;
 
-    inner_parse_packet(&raw, events, event_mapper)?;
+    inner_parse_packet(&raw, events, event_mapper, player_info)?;
 
     Ok(())
 }
@@ -118,6 +128,7 @@ fn inner_parse_packet(
     raw: &crate::csgo_proto::CDemoPacket,
     events: &mut Vec<DemoEvent>,
     event_mapper: &mut GameEventMapping,
+    player_info: &mut std::collections::HashMap<i32, Player>,
 ) -> Result<(), FirstPassError> {
     let mut bitreader = crate::bitreader::Bitreader::new(raw.data());
 
@@ -155,7 +166,10 @@ fn inner_parse_packet(
 
                 events.push(DemoEvent::ServerInfo(raw));
             }
-            crate::netmessagetypes::NetmessageType::net_SignonState => {}
+            crate::netmessagetypes::NetmessageType::net_SignonState => {
+                let raw: crate::csgo_proto::CnetMsgSignonState = prost::Message::decode(msg_bytes.as_slice())?;
+                dbg!(raw);
+            }
             crate::netmessagetypes::NetmessageType::net_Tick => {
                 let raw: crate::csgo_proto::CnetMsgTick =
                     prost::Message::decode(msg_bytes.as_slice())?;
@@ -181,6 +195,7 @@ fn inner_parse_packet(
                         match crate::game_event::EVENT_PARSERS.get(&name) {
                             Some(parser) => {
                                 let parsed = parser.parse(keys.as_slice(), raw.clone())?;
+
                                 events.push(DemoEvent::GameEvent(parsed));
                             }
                             None => {
@@ -212,7 +227,16 @@ fn inner_parse_packet(
             crate::netmessagetypes::NetmessageType::TE_WorldDecal => {}
             crate::netmessagetypes::NetmessageType::TE_EffectDispatch => {}
             crate::netmessagetypes::NetmessageType::CS_UM_PlayerStatsUpdate => {}
-            crate::netmessagetypes::NetmessageType::CS_UM_EndOfMatchAllPlayersData => {}
+            crate::netmessagetypes::NetmessageType::CS_UM_EndOfMatchAllPlayersData => {
+                let raw: crate::csgo_proto::CcsUsrMsgEndOfMatchAllPlayersData = prost::Message::decode(msg_bytes.as_slice())?;
+
+                for data in raw.allplayerdata {
+                    player_info.insert(data.slot(), Player {
+                        name: data.name.unwrap(),
+                        xuid: data.xuid.unwrap(),
+                    });
+                }
+            }
             crate::netmessagetypes::NetmessageType::TE_PhysicsProp => {}
             crate::netmessagetypes::NetmessageType::UM_TextMsg => {}
             crate::netmessagetypes::NetmessageType::CS_UM_VoteFailed => {}
