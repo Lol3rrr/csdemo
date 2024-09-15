@@ -61,8 +61,8 @@ macro_rules! define_event {
         #[derive(Debug)]
         #[allow(dead_code)]
         pub struct $name {
-            $($field: Option<$field_ty>,)*
-            remaining: ::std::collections::HashMap<String, crate::csgo_proto::c_msg_source1_legacy_game_event::KeyT>,
+            $(pub $field: Option<$field_ty>,)*
+            pub remaining: ::std::collections::HashMap<String, crate::csgo_proto::c_msg_source1_legacy_game_event::KeyT>,
         }
 
         impl $name {
