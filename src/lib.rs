@@ -16,6 +16,9 @@ mod packet;
 pub use packet::DemoEvent;
 pub mod game_event;
 
+mod values;
+pub use values::*;
+
 pub mod parser;
 
 pub mod csgo_proto {

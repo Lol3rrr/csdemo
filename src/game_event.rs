@@ -1,60 +1,4 @@
-use crate::csgo_proto;
-
-#[derive(Debug)]
-pub enum RawValue {
-    String(String),
-    F32(f32),
-    I32(i32),
-    Bool(bool),
-    U64(u64),
-}
-
-impl TryFrom<crate::csgo_proto::c_msg_source1_legacy_game_event::KeyT> for RawValue {
-    type Error = ();
-
-    fn try_from(value: crate::csgo_proto::c_msg_source1_legacy_game_event::KeyT) -> Result<Self, Self::Error> {
-        match value.r#type() {
-            1 if value.val_string.is_some() => Ok(Self::String(value.val_string.unwrap())),
-            2 if value.val_float.is_some() => Ok(Self::F32(value.val_float.unwrap())),
-            3 if value.val_long.is_some() => Ok(Self::I32(value.val_long.unwrap())),
-            4 if value.val_short.is_some() => Ok(Self::I32(value.val_short.unwrap() as i32)),
-            5 if value.val_byte.is_some() => Ok(Self::I32(value.val_byte.unwrap() as i32)),
-            6 if value.val_bool.is_some() => Ok(Self::Bool(value.val_bool.unwrap())),
-            7 if value.val_uint64.is_some() => Ok(Self::U64(value.val_uint64.unwrap())),
-            8 if value.val_long.is_some() => Ok(Self::I32(value.val_long.unwrap())),
-            9 if value.val_short.is_some() => Ok(Self::I32(value.val_short.unwrap() as i32)),
-            _ => Err(()),
-        }
-    }
-}
-
-impl TryFrom<RawValue> for i32 {
-    type Error = ();
-    fn try_from(value: RawValue) -> Result<Self, Self::Error> {
-        match value {
-            RawValue::I32(v) => Ok(v),
-            _ => Err(()),
-        }
-    }
-}
-impl TryFrom<RawValue> for bool {
-    type Error = ();
-    fn try_from(value: RawValue) -> Result<Self, Self::Error> {
-        match value {
-            RawValue::Bool(v) => Ok(v),
-            _ => Err(()),
-        }
-    }
-}
-impl TryFrom<RawValue> for String {
-    type Error = ();
-    fn try_from(value: RawValue) -> Result<Self, Self::Error> {
-        match value {
-            RawValue::String(v) => Ok(v),
-            _ => Err(()),
-        }
-    }
-}
+use crate::{csgo_proto, RawValue, UserId};
 
 macro_rules! define_event {
     ($name:ident, $target:path $(, ($field:ident, $field_ty:ty))*) => {
@@ -87,12 +31,48 @@ macro_rules! define_event {
 
 define_event!(HltvVersionInfo, GameEvent::HltvVersionInfo);
 
-define_event!(ItemEquip, GameEvent::ItemEquip, (userid, i32), (hassilencer, bool), (hastracers, bool), (item, String), (issilenced, bool), (canzoom, bool), (ispainted, bool), (weptype, i32), (defindex, i32));
-define_event!(ItemPickup, GameEvent::ItemPickup, (userid, RawValue), (item, RawValue), (silent, RawValue), (defindex, RawValue));
+define_event!(
+    ItemEquip,
+    GameEvent::ItemEquip,
+    (userid, UserId),
+    (hassilencer, bool),
+    (hastracers, bool),
+    (item, String),
+    (issilenced, bool),
+    (canzoom, bool),
+    (ispainted, bool),
+    (weptype, i32),
+    (defindex, i32)
+);
+define_event!(
+    ItemPickup,
+    GameEvent::ItemPickup,
+    (userid, UserId),
+    (item, RawValue),
+    (silent, RawValue),
+    (defindex, RawValue)
+);
 
-define_event!(WeaponReload, GameEvent::WeaponReload, (userid, RawValue), (userid_pawn, RawValue));
-define_event!(WeaponZoom, GameEvent::WeaponZoom, (userid, RawValue), (userid_pawn, RawValue));
-define_event!(WeaponFire, GameEvent::WeaponFire, (userid, RawValue), (weapon, RawValue), (silenced, RawValue), (userid_pawn, RawValue));
+define_event!(
+    WeaponReload,
+    GameEvent::WeaponReload,
+    (userid, UserId),
+    (userid_pawn, RawValue)
+);
+define_event!(
+    WeaponZoom,
+    GameEvent::WeaponZoom,
+    (userid, UserId),
+    (userid_pawn, RawValue)
+);
+define_event!(
+    WeaponFire,
+    GameEvent::WeaponFire,
+    (userid, UserId),
+    (weapon, RawValue),
+    (silenced, RawValue),
+    (userid_pawn, RawValue)
+);
 
 define_event!(SmokeGrenadeDetonate, GameEvent::SmokeGrenadeDetonate);
 define_event!(SmokeGrenadeExpired, GameEvent::SmokeGrenadeExpired);
@@ -103,16 +83,106 @@ define_event!(FlashbangDetonate, GameEvent::FlashbangDetonate);
 define_event!(DecoyStarted, GameEvent::DecoyStarted);
 define_event!(DecoyDetonate, GameEvent::DecoyDetonate);
 
-define_event!(PlayerConnect, GameEvent::PlayerConnect, (address, RawValue), (bot, RawValue), (name, RawValue), (userid, RawValue), (networkid, RawValue), (xuid, RawValue));
-define_event!(PlayerConnectFull, GameEvent::PlayerConnectFull, (userid, RawValue));
-define_event!(PlayerDisconnect, GameEvent::PlayerDisconnect, (userid, RawValue), (reason, RawValue), (name, RawValue), (networkid, RawValue), (xuid, RawValue));
-define_event!(PlayerFootstep, GameEvent::PlayerFootstep);
-define_event!(PlayerJump, GameEvent::PlayerJump);
-define_event!(PlayerHurt, GameEvent::PlayerHurt);
-define_event!(PlayerDeath, GameEvent::PlayerDeath);
-define_event!(PlayerSpawn, GameEvent::PlayerSpawn);
-define_event!(PlayerBlind, GameEvent::PlayerBlind);
-define_event!(PlayerTeam, GameEvent::PlayerTeam, (userid, RawValue), (team, RawValue), (oldteam, RawValue), (disconnect, RawValue), (silent, RawValue), (isbot, RawValue), (userid_pawn, RawValue));
+define_event!(
+    PlayerConnect,
+    GameEvent::PlayerConnect,
+    (address, RawValue),
+    (bot, RawValue),
+    (name, RawValue),
+    (userid, i32),
+    (networkid, RawValue),
+    (xuid, RawValue)
+);
+define_event!(
+    PlayerConnectFull,
+    GameEvent::PlayerConnectFull,
+    (userid, UserId)
+);
+define_event!(
+    PlayerDisconnect,
+    GameEvent::PlayerDisconnect,
+    (userid, UserId),
+    (reason, RawValue),
+    (name, RawValue),
+    (networkid, RawValue),
+    (xuid, RawValue)
+);
+define_event!(
+    PlayerFootstep,
+    GameEvent::PlayerFootstep,
+    (userid, UserId),
+    (userid_pawn, RawValue)
+);
+define_event!(PlayerJump, GameEvent::PlayerJump, (userid, i32));
+define_event!(
+    PlayerHurt,
+    GameEvent::PlayerHurt,
+    (userid, UserId),
+    (attacker, UserId),
+    (health, RawValue),
+    (armor, RawValue),
+    (weapon, String),
+    (dmg_health, RawValue),
+    (dmg_armor, RawValue),
+    (hitgroup, RawValue),
+    (userid_pawn, RawValue),
+    (attacker_pawn, RawValue)
+);
+define_event!(
+    PlayerDeath,
+    GameEvent::PlayerDeath,
+    (userid, UserId),
+    (attacker, UserId),
+    (assister, UserId),
+    (assistedflash, bool),
+    (weapon, String),
+    (weapon_itemid, String),
+    (weapon_fauxitemid, String),
+    (weapon_originalowner_xuid, String),
+    (headshot, bool),
+    (dominated, RawValue),
+    (revenge, RawValue),
+    (wipe, RawValue),
+    (penetrated, RawValue),
+    (noreplay, bool),
+    (noscope, bool),
+    (thrusmoke, bool),
+    (attackerblind, bool),
+    (distance, RawValue),
+    (userid_pawn, RawValue),
+    (attacker_pawn, RawValue),
+    (assister_pawn, RawValue),
+    (dmg_health, RawValue),
+    (dmg_armor, RawValue),
+    (hitgroup, RawValue),
+    (attackerinair, bool)
+);
+define_event!(
+    PlayerSpawn,
+    GameEvent::PlayerSpawn,
+    (userid, UserId),
+    (inrestart, RawValue),
+    (userid_pawn, RawValue)
+);
+define_event!(
+    PlayerBlind,
+    GameEvent::PlayerBlind,
+    (userid, UserId),
+    (attacker, RawValue),
+    (entityid, RawValue),
+    (blind_duration, RawValue)
+);
+define_event!(
+    PlayerTeam,
+    GameEvent::PlayerTeam,
+    (userid, UserId),
+    (team, RawValue),
+    (oldteam, RawValue),
+    (disconnect, RawValue),
+    (silent, RawValue),
+    (isbot, RawValue),
+    (userid_pawn, RawValue)
+);
 
 define_event!(BulletDamage, GameEvent::BulletDamage);
 
@@ -138,12 +208,18 @@ define_event!(RoundPreRestart, GameEvent::RoundPreRestart);
 define_event!(RoundTimeWarning, GameEvent::RoundTimeWarning);
 define_event!(RoundFinalBeep, GameEvent::RoundFinalBeep);
 define_event!(BuyTimeEnded, GameEvent::BuyTimeEnded);
-define_event!(RoundAnnounceLastRoundHalf, GameEvent::RoundAnnounceLastRoundHalf);
+define_event!(
+    RoundAnnounceLastRoundHalf,
+    GameEvent::RoundAnnounceLastRoundHalf
+);
 define_event!(AnnouncePhaseEnd, GameEvent::AnnouncePhaseEnd);
 
 define_event!(WinPanelMatch, GameEvent::WinPanelMatch);
 
-type ParseFn = fn(keys: &[csgo_proto::csvc_msg_game_event_list::KeyT], event: csgo_proto::CMsgSource1LegacyGameEvent) -> Result<GameEvent, ParseGameEventError>;
+type ParseFn = fn(
+    keys: &[csgo_proto::csvc_msg_game_event_list::KeyT],
+    event: csgo_proto::CMsgSource1LegacyGameEvent,
+) -> Result<GameEvent, ParseGameEventError>;
 
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -203,7 +279,7 @@ pub enum GameEvent {
     BuyTimeEnded(BuyTimeEnded),
     RoundAnnounceLastRoundHalf(RoundAnnounceLastRoundHalf),
     AnnouncePhaseEnd(AnnouncePhaseEnd),
-    
+
     WinPanelMatch(WinPanelMatch),
 }
 
@@ -217,7 +293,7 @@ pub static EVENT_PARSERS: phf::Map<&'static str, GameEventParser> = phf::phf_map
 
     "item_equip" => GameEventParser::new(ItemEquip::parse),
     "item_pickup" => GameEventParser::new(ItemPickup::parse),
-    
+
     "weapon_reload" => GameEventParser::new(WeaponReload::parse),
     "weapon_zoom" => GameEventParser::new(WeaponZoom::parse),
     "weapon_fire" => GameEventParser::new(WeaponFire::parse),
@@ -230,7 +306,7 @@ pub static EVENT_PARSERS: phf::Map<&'static str, GameEventParser> = phf::phf_map
     "flashbang_detonate" => GameEventParser::new(FlashbangDetonate::parse),
     "decoy_started" => GameEventParser::new(DecoyStarted::parse),
     "decoy_detonate" => GameEventParser::new(DecoyDetonate::parse),
-    
+
     "player_connect" => GameEventParser::new(PlayerConnect::parse),
     "player_connect_full" => GameEventParser::new(PlayerConnectFull::parse),
     "player_disconnect" => GameEventParser::new(PlayerDisconnect::parse),
@@ -241,7 +317,7 @@ pub static EVENT_PARSERS: phf::Map<&'static str, GameEventParser> = phf::phf_map
     "player_spawn" => GameEventParser::new(PlayerSpawn::parse),
     "player_blind" => GameEventParser::new(PlayerBlind::parse),
     "player_team" => GameEventParser::new(PlayerTeam::parse),
-    
+
     "bullet_damage" => GameEventParser::new(BulletDamage::parse),
 
     "other_death" => GameEventParser::new(OtherDeath::parse),
@@ -273,17 +349,22 @@ pub static EVENT_PARSERS: phf::Map<&'static str, GameEventParser> = phf::phf_map
 };
 
 pub struct GameEventParser {
-    inner: fn(keys: &[csgo_proto::csvc_msg_game_event_list::KeyT], event: csgo_proto::CMsgSource1LegacyGameEvent) -> Result<GameEvent, ParseGameEventError>,
+    inner: fn(
+        keys: &[csgo_proto::csvc_msg_game_event_list::KeyT],
+        event: csgo_proto::CMsgSource1LegacyGameEvent,
+    ) -> Result<GameEvent, ParseGameEventError>,
 }
 
 impl GameEventParser {
     pub const fn new(func: ParseFn) -> Self {
-        Self {
-            inner: func,
-        }
+        Self { inner: func }
     }
 
-    pub fn parse(&self, keys: &[csgo_proto::csvc_msg_game_event_list::KeyT], event: csgo_proto::CMsgSource1LegacyGameEvent) -> Result<GameEvent, ParseGameEventError> {
+    pub fn parse(
+        &self,
+        keys: &[csgo_proto::csvc_msg_game_event_list::KeyT],
+        event: csgo_proto::CMsgSource1LegacyGameEvent,
+    ) -> Result<GameEvent, ParseGameEventError> {
         if keys.len() != event.keys.len() {
             return Err(ParseGameEventError::MismatchedKeysFields);
         }

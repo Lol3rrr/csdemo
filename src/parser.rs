@@ -1,4 +1,4 @@
-use crate::{packet::DemoEvent, DemoCommand, Frame};
+use crate::{packet::DemoEvent, DemoCommand, Frame, UserId};
 
 #[derive(Debug)]
 pub enum FirstPassError {
@@ -8,7 +8,7 @@ pub enum FirstPassError {
     MissingFileHeader,
     MissingFileInfo,
     Bitreader(crate::bitreader::BitReadError),
-    ParseGameEventError(crate::game_event::ParseGameEventError)
+    ParseGameEventError(crate::game_event::ParseGameEventError),
 }
 
 impl From<prost::DecodeError> for FirstPassError {
@@ -38,12 +38,18 @@ pub struct FirstPassOutput {
     pub header: crate::csgo_proto::CDemoFileHeader,
     pub info: crate::csgo_proto::CDemoFileInfo,
     pub events: Vec<DemoEvent>,
-    pub player_info: std::collections::HashMap<i32, Player>,
+    pub player_info: std::collections::HashMap<UserId, Player>,
 }
 
 #[derive(Debug)]
 struct GameEventMapping {
-    mapping: std::collections::HashMap<i32, (String, Vec<crate::csgo_proto::csvc_msg_game_event_list::KeyT>)>,
+    mapping: std::collections::HashMap<
+        i32,
+        (
+            String,
+            Vec<crate::csgo_proto::csvc_msg_game_event_list::KeyT>,
+        ),
+    >,
 }
 
 pub fn parse<'b, FI>(frames: FI) -> Result<FirstPassOutput, FirstPassError>
@@ -87,14 +93,19 @@ where
     let header = header.ok_or(FirstPassError::MissingFileHeader)?;
     let info = file_info.ok_or(FirstPassError::MissingFileInfo)?;
 
-    Ok(FirstPassOutput { header, info, events, player_info })
+    Ok(FirstPassOutput {
+        header,
+        info,
+        events,
+        player_info,
+    })
 }
 
 fn parse_fullpacket(
     data: &[u8],
     events: &mut Vec<DemoEvent>,
     event_mapper: &mut GameEventMapping,
-    player_info: &mut std::collections::HashMap<i32, Player>,
+    player_info: &mut std::collections::HashMap<UserId, Player>,
 ) -> Result<(), FirstPassError> {
     let raw: crate::csgo_proto::CDemoFullPacket = prost::Message::decode(data)?;
 
@@ -115,7 +126,7 @@ fn parse_packet(
     data: &[u8],
     events: &mut Vec<DemoEvent>,
     event_mapper: &mut GameEventMapping,
-    player_info: &mut std::collections::HashMap<i32, Player>,
+    player_info: &mut std::collections::HashMap<UserId, Player>,
 ) -> Result<(), FirstPassError> {
     let raw: crate::csgo_proto::CDemoPacket = prost::Message::decode(data)?;
 
@@ -128,7 +139,7 @@ fn inner_parse_packet(
     raw: &crate::csgo_proto::CDemoPacket,
     events: &mut Vec<DemoEvent>,
     event_mapper: &mut GameEventMapping,
-    player_info: &mut std::collections::HashMap<i32, Player>,
+    player_info: &mut std::collections::HashMap<UserId, Player>,
 ) -> Result<(), FirstPassError> {
     let mut bitreader = crate::bitreader::Bitreader::new(raw.data());
 
@@ -167,7 +178,8 @@ fn inner_parse_packet(
                 events.push(DemoEvent::ServerInfo(raw));
             }
             crate::netmessagetypes::NetmessageType::net_SignonState => {
-                let raw: crate::csgo_proto::CnetMsgSignonState = prost::Message::decode(msg_bytes.as_slice())?;
+                let raw: crate::csgo_proto::CnetMsgSignonState =
+                    prost::Message::decode(msg_bytes.as_slice())?;
                 dbg!(raw);
             }
             crate::netmessagetypes::NetmessageType::net_Tick => {
@@ -228,13 +240,17 @@ fn inner_parse_packet(
             crate::netmessagetypes::NetmessageType::TE_EffectDispatch => {}
             crate::netmessagetypes::NetmessageType::CS_UM_PlayerStatsUpdate => {}
             crate::netmessagetypes::NetmessageType::CS_UM_EndOfMatchAllPlayersData => {
-                let raw: crate::csgo_proto::CcsUsrMsgEndOfMatchAllPlayersData = prost::Message::decode(msg_bytes.as_slice())?;
+                let raw: crate::csgo_proto::CcsUsrMsgEndOfMatchAllPlayersData =
+                    prost::Message::decode(msg_bytes.as_slice())?;
 
                 for data in raw.allplayerdata {
-                    player_info.insert(data.slot(), Player {
-                        name: data.name.unwrap(),
-                        xuid: data.xuid.unwrap(),
-                    });
+                    player_info.insert(
+                        UserId(data.slot()),
+                        Player {
+                            name: data.name.unwrap(),
+                            xuid: data.xuid.unwrap(),
+                        },
+                    );
                 }
             }
             crate::netmessagetypes::NetmessageType::TE_PhysicsProp => {}

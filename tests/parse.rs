@@ -1,3 +1,5 @@
+use csdemo::{game_event::GameEvent, DemoEvent};
+
 #[test]
 fn mirage_1() {
     let content = std::fs::read("testfiles/mirage.dem").unwrap();
@@ -11,7 +13,27 @@ fn mirage_1() {
 
     assert_eq!("de_mirage", output.header.map_name());
 
-    todo!()
+    for event in output.events.iter() {
+        match event {
+            DemoEvent::GameEvent(gevent) => match gevent {
+                GameEvent::PlayerDeath(death) => {
+                    assert!(
+                        death.remaining.is_empty(),
+                        "Remaining for PlayerDeath: {:?}",
+                        death.remaining
+                    );
+
+                    let died_user = output
+                        .player_info
+                        .get(death.userid.as_ref().unwrap())
+                        .unwrap();
+                    dbg!(died_user);
+                }
+                _ => {}
+            },
+            _ => {}
+        };
+    }
 }
 
 #[test]
