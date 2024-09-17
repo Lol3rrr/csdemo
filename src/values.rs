@@ -57,7 +57,7 @@ impl TryFrom<RawValue> for String {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
-pub struct UserId(pub(crate) i32);
+pub struct UserId(pub i32);
 
 impl TryFrom<RawValue> for UserId {
     type Error = ();
