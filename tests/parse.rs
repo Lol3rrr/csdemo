@@ -27,13 +27,15 @@ fn mirage_1() {
                         .player_info
                         .get(death.userid.as_ref().unwrap())
                         .unwrap();
-                    dbg!(died_user);
+                    // dbg!(died_user);
                 }
                 _ => {}
             },
             _ => {}
         };
     }
+
+    todo!()
 }
 
 #[test]
