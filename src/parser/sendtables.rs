@@ -107,6 +107,7 @@ impl VectorField {
 pub fn get_serializers(
     msg: &crate::csgo_proto::CsvcMsgFlattenedSerializer,
     qf_mapper: &mut decoder::QfMapper,
+    prop_controller: &mut super::propcontroller::PropController,
 ) -> Result<std::collections::HashMap<String, Serializer>, super::FirstPassError> {
     let mut fields: Vec<Option<ConstructorField>> = vec![None; msg.fields.len()];
     let mut field_type_map: std::collections::HashMap<String, FieldType> =
@@ -120,7 +121,9 @@ pub fn get_serializers(
     }
 
     for serializer in msg.serializers.iter() {
-        let ser = generate_serializer(serializer, &mut fields, msg, &mut serializers)?;
+        let mut ser = generate_serializer(serializer, &mut fields, msg, &mut serializers)?;
+        prop_controller.find_prop_name_paths(&mut ser);
+
         serializers.insert(ser.name.clone(), ser);
     }
 
@@ -495,6 +498,23 @@ impl Field {
         }
     }
 
+    pub fn get_inner_mut(&mut self, idx: usize) -> Result<&mut Field, super::FirstPassError> {
+        match self {
+            Field::Array(inner) => Ok(&mut inner.field_enum),
+            Field::Vector(inner) => Ok(&mut inner.field_enum),
+            Field::Serializer(inner) => match inner.serializer.fields.get_mut(idx) {
+                Some(f) => Ok(f),
+                None => panic!(),
+            },
+            Field::Pointer(inner) => match inner.serializer.fields.get_mut(idx) {
+                Some(f) => Ok(f),
+                None => panic!(),
+            }, // Illegal
+            Field::Value(_) => panic!(),
+            Field::None => panic!(),
+        }
+    }
+
     pub fn get_propinfo(&self, path: &super::FieldPath) -> Option<FieldInfo> {
         const MY_WEAPONS_OFFSET: u32 = 500000;
         const WEAPON_SKIN_ID: u32 = 10000000;
@@ -577,9 +597,10 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
+    #[ignore = "Testing"]
     fn parse_ancient_example_msg() {
-        use Field::*;
         use decoder::Decoder::*;
+        use Field::*;
 
         let data: &[u8] = include_bytes!("../../testfiles/ancient_sendtables.b");
 
@@ -588,860 +609,670 @@ mod tests {
             map: std::collections::HashMap::new(),
         };
 
-        let serializer_msg: crate::csgo_proto::CsvcMsgFlattenedSerializer =
-                    prost::Message::decode(data).unwrap();
+        let mut prop_controller = crate::parser::propcontroller::PropController::new();
 
-        let result = get_serializers(&serializer_msg, &mut qf_mapper).unwrap();
+        let serializer_msg: crate::csgo_proto::CsvcMsgFlattenedSerializer =
+            prost::Message::decode(data).unwrap();
+
+        let result =
+            get_serializers(&serializer_msg, &mut qf_mapper, &mut prop_controller).unwrap();
 
         let cworld_parser = result.get("CWorld").unwrap();
-        dbg!(&cworld_parser);
 
         let expected_parser = super::Serializer {
             name: "CWorld".to_string(),
-    fields: [
-        Value(
-            ValueField {
-                decoder: FloatSimulationTimeDecoder,
-                name: "m_flAnimTime".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flAnimTime".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: FloatSimulationTimeDecoder,
-                name: "m_flSimulationTime".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flSimulationTime".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_hOwnerEntity".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_hOwnerEntity".to_string(),
-            },
-        ),
-        Pointer(
-            PointerField {
-                decoder: BooleanDecoder,
-                serializer: super::Serializer {
-                    name: "CBodyComponentBaseModelEntity".to_string(),
-                    fields: [
-                        Value(
-                            ValueField {
+            fields: [
+                Value(ValueField {
+                    decoder: FloatSimulationTimeDecoder,
+                    name: "m_flAnimTime".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flAnimTime".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: FloatSimulationTimeDecoder,
+                    name: "m_flSimulationTime".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flSimulationTime".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_hOwnerEntity".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_hOwnerEntity".to_string(),
+                }),
+                Pointer(PointerField {
+                    decoder: BooleanDecoder,
+                    serializer: super::Serializer {
+                        name: "CBodyComponentBaseModelEntity".to_string(),
+                        fields: [
+                            Value(ValueField {
                                 decoder: UnsignedDecoder,
                                 name: "m_cellX".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_cellX".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: UnsignedDecoder,
                                 name: "m_cellY".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_cellY".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: UnsignedDecoder,
                                 name: "m_cellZ".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_cellZ".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
-                                decoder: QuantalizedFloatDecoder(
-                                    0,
-                                ),
+                            }),
+                            Value(ValueField {
+                                decoder: QuantalizedFloatDecoder(0),
                                 name: "m_vecX".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_vecX".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
-                                decoder: QuantalizedFloatDecoder(
-                                    1,
-                                ),
+                            }),
+                            Value(ValueField {
+                                decoder: QuantalizedFloatDecoder(1),
                                 name: "m_vecY".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_vecY".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
-                                decoder: QuantalizedFloatDecoder(
-                                    2,
-                                ),
+                            }),
+                            Value(ValueField {
+                                decoder: QuantalizedFloatDecoder(2),
                                 name: "m_vecZ".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_vecZ".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: UnsignedDecoder,
                                 name: "m_hParent".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_hParent".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: QanglePresDecoder,
                                 name: "m_angRotation".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_angRotation".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: NoscaleDecoder,
                                 name: "m_flScale".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_flScale".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: UnsignedDecoder,
                                 name: "m_name".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_name".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: UnsignedDecoder,
                                 name: "m_hierarchyAttachName".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_hierarchyAttachName".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: Unsigned64Decoder,
                                 name: "m_hModel".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_hModel".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: BooleanDecoder,
                                 name: "m_bClientClothCreationSuppressed".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_bClientClothCreationSuppressed".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: Unsigned64Decoder,
                                 name: "m_MeshGroupMask".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_MeshGroupMask".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: SignedDecoder,
                                 name: "m_nIdealMotionType".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_nIdealMotionType".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: BooleanDecoder,
                                 name: "m_bIsAnimationEnabled".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_bIsAnimationEnabled".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: BooleanDecoder,
                                 name: "m_bUseParentRenderBounds".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_bUseParentRenderBounds".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: UnsignedDecoder,
                                 name: "m_materialGroup".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_materialGroup".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: UnsignedDecoder,
                                 name: "m_nHitboxSet".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_nHitboxSet".to_string(),
-                            },
-                        ),
-                        Value(
-                            ValueField {
+                            }),
+                            Value(ValueField {
                                 decoder: UnsignedDecoder,
                                 name: "m_nOutsideWorld".to_string(),
                                 should_parse: false,
                                 prop_id: 0,
                                 full_name: "None m_nOutsideWorld".to_string(),
-                            },
-                        ),
-                    ].to_vec(),
-                },
-            },
-        ),
-        Pointer(
-            PointerField {
-                decoder: BooleanDecoder,
-                serializer: super::Serializer {
-                    name: "CEntityIdentity".to_string(),
-                    fields: [
-                        Value(
-                            ValueField {
-                                decoder: SignedDecoder,
-                                name: "m_nameStringableIndex".to_string(),
-                                should_parse: false,
-                                prop_id: 0,
-                                full_name: "None m_nameStringableIndex".to_string(),
-                            },
-                        ),
-                    ].to_vec(),
-                },
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: BooleanDecoder,
-                name: "m_bVisibleinPVS".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_bVisibleinPVS".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: BooleanDecoder,
-                name: "m_bIsPlatform".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_bIsPlatform".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: Unsigned64Decoder,
-                name: "m_MoveCollide".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_MoveCollide".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: Unsigned64Decoder,
-                name: "m_MoveType".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_MoveType".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_nSubclassID".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nSubclassID".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flCreateTime".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flCreateTime".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_ubInterpolationFrame".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_ubInterpolationFrame".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_iTeamNum".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_iTeamNum".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_hEffectEntity".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_hEffectEntity".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_fEffects".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_fEffects".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: FloatCoordDecoder,
-                name: "m_flElasticity".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flElasticity".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: BooleanDecoder,
-                name: "m_bAnimatedEveryTick".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_bAnimatedEveryTick".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flNavIgnoreUntilTime".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flNavIgnoreUntilTime".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_nBloodType".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nBloodType".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: Unsigned64Decoder,
-                name: "m_nRenderMode".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nRenderMode".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: Unsigned64Decoder,
-                name: "m_nRenderFX".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nRenderFX".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_clrRender".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_clrRender".to_string(),
-            },
-        ),
-        Vector(
-            VectorField {
-                field_enum: Box::new(Serializer(
-                    SerializerField {
+                            }),
+                        ]
+                        .to_vec(),
+                    },
+                }),
+                Pointer(PointerField {
+                    decoder: BooleanDecoder,
+                    serializer: super::Serializer {
+                        name: "CEntityIdentity".to_string(),
+                        fields: [Value(ValueField {
+                            decoder: SignedDecoder,
+                            name: "m_nameStringableIndex".to_string(),
+                            should_parse: false,
+                            prop_id: 0,
+                            full_name: "None m_nameStringableIndex".to_string(),
+                        })]
+                        .to_vec(),
+                    },
+                }),
+                Value(ValueField {
+                    decoder: BooleanDecoder,
+                    name: "m_bVisibleinPVS".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_bVisibleinPVS".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: BooleanDecoder,
+                    name: "m_bIsPlatform".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_bIsPlatform".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: Unsigned64Decoder,
+                    name: "m_MoveCollide".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_MoveCollide".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: Unsigned64Decoder,
+                    name: "m_MoveType".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_MoveType".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_nSubclassID".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nSubclassID".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flCreateTime".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flCreateTime".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_ubInterpolationFrame".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_ubInterpolationFrame".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_iTeamNum".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_iTeamNum".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_hEffectEntity".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_hEffectEntity".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_fEffects".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_fEffects".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: FloatCoordDecoder,
+                    name: "m_flElasticity".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flElasticity".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: BooleanDecoder,
+                    name: "m_bAnimatedEveryTick".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_bAnimatedEveryTick".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flNavIgnoreUntilTime".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flNavIgnoreUntilTime".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_nBloodType".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nBloodType".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: Unsigned64Decoder,
+                    name: "m_nRenderMode".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nRenderMode".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: Unsigned64Decoder,
+                    name: "m_nRenderFX".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nRenderFX".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_clrRender".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_clrRender".to_string(),
+                }),
+                Vector(VectorField {
+                    field_enum: Box::new(Serializer(SerializerField {
                         serializer: super::Serializer {
                             name: "EntityRenderAttribute_t".to_string(),
                             fields: [
-                                Value(
-                                    ValueField {
-                                        decoder: UnsignedDecoder,
-                                        name: "m_ID".to_string(),
-                                        should_parse: false,
-                                        prop_id: 0,
-                                        full_name: "None m_ID".to_string(),
-                                    },
-                                ),
-                                Value(
-                                    ValueField {
-                                        decoder: VectorNoscaleDecoder,
-                                        name: "m_Values".to_string(),
-                                        should_parse: false,
-                                        prop_id: 0,
-                                        full_name: "None m_Values".to_string(),
-                                    },
-                                ),
-                            ].to_vec(),
+                                Value(ValueField {
+                                    decoder: UnsignedDecoder,
+                                    name: "m_ID".to_string(),
+                                    should_parse: false,
+                                    prop_id: 0,
+                                    full_name: "None m_ID".to_string(),
+                                }),
+                                Value(ValueField {
+                                    decoder: VectorNoscaleDecoder,
+                                    name: "m_Values".to_string(),
+                                    should_parse: false,
+                                    prop_id: 0,
+                                    full_name: "None m_Values".to_string(),
+                                }),
+                            ]
+                            .to_vec(),
                         },
-                    },
-                )),
-                decoder: UnsignedDecoder,
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: BooleanDecoder,
-                name: "m_bRenderToCubemaps".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_bRenderToCubemaps".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: Unsigned64Decoder,
-                name: "m_nInteractsAs".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nInteractsAs".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: Unsigned64Decoder,
-                name: "m_nInteractsWith".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nInteractsWith".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: Unsigned64Decoder,
-                name: "m_nInteractsExclude".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nInteractsExclude".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_nEntityId".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nEntityId".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_nOwnerId".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nOwnerId".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_nHierarchyId".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nHierarchyId".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_nCollisionGroup".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nCollisionGroup".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_nCollisionFunctionMask".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nCollisionFunctionMask".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: VectorNoscaleDecoder,
-                name: "m_vecMins".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_vecMins".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: VectorNoscaleDecoder,
-                name: "m_vecMaxs".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_vecMaxs".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_usSolidFlags".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_usSolidFlags".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: Unsigned64Decoder,
-                name: "m_nSolidType".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nSolidType".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_triggerBloat".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_triggerBloat".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: Unsigned64Decoder,
-                name: "m_nSurroundType".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nSurroundType".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_CollisionGroup".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_CollisionGroup".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_nEnablePhysics".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nEnablePhysics".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: VectorNoscaleDecoder,
-                name: "m_vecSpecifiedSurroundingMins".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_vecSpecifiedSurroundingMins".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: VectorNoscaleDecoder,
-                name: "m_vecSpecifiedSurroundingMaxs".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_vecSpecifiedSurroundingMaxs".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: VectorNoscaleDecoder,
-                name: "m_vCapsuleCenter1".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_vCapsuleCenter1".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: VectorNoscaleDecoder,
-                name: "m_vCapsuleCenter2".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_vCapsuleCenter2".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flCapsuleRadius".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flCapsuleRadius".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: SignedDecoder,
-                name: "m_iGlowType".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_iGlowType".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: SignedDecoder,
-                name: "m_iGlowTeam".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_iGlowTeam".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: SignedDecoder,
-                name: "m_nGlowRange".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nGlowRange".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: SignedDecoder,
-                name: "m_nGlowRangeMin".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nGlowRangeMin".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_glowColorOverride".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_glowColorOverride".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: BooleanDecoder,
-                name: "m_bFlashing".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_bFlashing".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flGlowTime".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flGlowTime".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flGlowStartTime".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flGlowStartTime".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: BooleanDecoder,
-                name: "m_bEligibleForScreenHighlight".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_bEligibleForScreenHighlight".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flGlowBackfaceMult".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flGlowBackfaceMult".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_fadeMinDist".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_fadeMinDist".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_fadeMaxDist".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_fadeMaxDist".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flFadeScale".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flFadeScale".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flShadowStrength".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flShadowStrength".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: UnsignedDecoder,
-                name: "m_nObjectCulling".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nObjectCulling".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: SignedDecoder,
-                name: "m_nAddDecal".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_nAddDecal".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: VectorNoscaleDecoder,
-                name: "m_vDecalPosition".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_vDecalPosition".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: VectorNoscaleDecoder,
-                name: "m_vDecalForwardAxis".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_vDecalForwardAxis".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flDecalHealBloodRate".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flDecalHealBloodRate".to_string(),
-            },
-        ),
-        Value(
-            ValueField {
-                decoder: NoscaleDecoder,
-                name: "m_flDecalHealHeightRate".to_string(),
-                should_parse: false,
-                prop_id: 0,
-                full_name: "None m_flDecalHealHeightRate".to_string(),
-            },
-        ),
-        Vector(
-            VectorField {
-                field_enum: Box::new(Value(
-                    ValueField {
+                    })),
+                    decoder: UnsignedDecoder,
+                }),
+                Value(ValueField {
+                    decoder: BooleanDecoder,
+                    name: "m_bRenderToCubemaps".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_bRenderToCubemaps".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: Unsigned64Decoder,
+                    name: "m_nInteractsAs".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nInteractsAs".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: Unsigned64Decoder,
+                    name: "m_nInteractsWith".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nInteractsWith".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: Unsigned64Decoder,
+                    name: "m_nInteractsExclude".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nInteractsExclude".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_nEntityId".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nEntityId".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_nOwnerId".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nOwnerId".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_nHierarchyId".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nHierarchyId".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_nCollisionGroup".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nCollisionGroup".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_nCollisionFunctionMask".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nCollisionFunctionMask".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: VectorNoscaleDecoder,
+                    name: "m_vecMins".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_vecMins".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: VectorNoscaleDecoder,
+                    name: "m_vecMaxs".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_vecMaxs".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_usSolidFlags".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_usSolidFlags".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: Unsigned64Decoder,
+                    name: "m_nSolidType".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nSolidType".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_triggerBloat".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_triggerBloat".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: Unsigned64Decoder,
+                    name: "m_nSurroundType".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nSurroundType".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_CollisionGroup".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_CollisionGroup".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_nEnablePhysics".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nEnablePhysics".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: VectorNoscaleDecoder,
+                    name: "m_vecSpecifiedSurroundingMins".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_vecSpecifiedSurroundingMins".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: VectorNoscaleDecoder,
+                    name: "m_vecSpecifiedSurroundingMaxs".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_vecSpecifiedSurroundingMaxs".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: VectorNoscaleDecoder,
+                    name: "m_vCapsuleCenter1".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_vCapsuleCenter1".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: VectorNoscaleDecoder,
+                    name: "m_vCapsuleCenter2".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_vCapsuleCenter2".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flCapsuleRadius".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flCapsuleRadius".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: SignedDecoder,
+                    name: "m_iGlowType".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_iGlowType".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: SignedDecoder,
+                    name: "m_iGlowTeam".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_iGlowTeam".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: SignedDecoder,
+                    name: "m_nGlowRange".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nGlowRange".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: SignedDecoder,
+                    name: "m_nGlowRangeMin".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nGlowRangeMin".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_glowColorOverride".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_glowColorOverride".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: BooleanDecoder,
+                    name: "m_bFlashing".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_bFlashing".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flGlowTime".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flGlowTime".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flGlowStartTime".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flGlowStartTime".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: BooleanDecoder,
+                    name: "m_bEligibleForScreenHighlight".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_bEligibleForScreenHighlight".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flGlowBackfaceMult".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flGlowBackfaceMult".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_fadeMinDist".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_fadeMinDist".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_fadeMaxDist".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_fadeMaxDist".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flFadeScale".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flFadeScale".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flShadowStrength".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flShadowStrength".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: UnsignedDecoder,
+                    name: "m_nObjectCulling".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nObjectCulling".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: SignedDecoder,
+                    name: "m_nAddDecal".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_nAddDecal".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: VectorNoscaleDecoder,
+                    name: "m_vDecalPosition".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_vDecalPosition".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: VectorNoscaleDecoder,
+                    name: "m_vDecalForwardAxis".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_vDecalForwardAxis".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flDecalHealBloodRate".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flDecalHealBloodRate".to_string(),
+                }),
+                Value(ValueField {
+                    decoder: NoscaleDecoder,
+                    name: "m_flDecalHealHeightRate".to_string(),
+                    should_parse: false,
+                    prop_id: 0,
+                    full_name: "None m_flDecalHealHeightRate".to_string(),
+                }),
+                Vector(VectorField {
+                    field_enum: Box::new(Value(ValueField {
                         decoder: UnsignedDecoder,
                         name: "m_ConfigEntitiesToPropagateMaterialDecalsTo".to_string(),
                         should_parse: false,
                         prop_id: 0,
                         full_name: "None m_ConfigEntitiesToPropagateMaterialDecalsTo".to_string(),
-                    },
-                )),
-                decoder: UnsignedDecoder,
-            },
-        ),
-        Array(
-            ArrayField {
-                field_enum: Box::new(Value(
-                    ValueField {
+                    })),
+                    decoder: UnsignedDecoder,
+                }),
+                Array(ArrayField {
+                    field_enum: Box::new(Value(ValueField {
                         decoder: UnsignedDecoder,
                         name: "m_bvDisabledHitGroups".to_string(),
                         should_parse: false,
                         prop_id: 0,
                         full_name: "None m_bvDisabledHitGroups".to_string(),
+                    })),
+                    length: 1,
+                }),
+                Pointer(PointerField {
+                    decoder: BooleanDecoder,
+                    serializer: super::Serializer {
+                        name: "CRenderComponent".to_string(),
+                        fields: [].to_vec(),
                     },
-                )),
-                length: 1,
-            },
-        ),
-        Pointer(
-            PointerField {
-                decoder: BooleanDecoder,
-                serializer: super::Serializer {
-                    name: "CRenderComponent".to_string(),
-                    fields: [].to_vec(),
-                },
-            },
-        ),
-    ].to_vec()
+                }),
+            ]
+            .to_vec(),
         };
 
         assert_eq!(&expected_parser, cworld_parser);

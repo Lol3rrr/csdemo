@@ -4,6 +4,8 @@ mod fieldpath;
 pub use fieldpath::{FieldPath, Paths};
 
 mod decoder;
+mod entities;
+mod propcontroller;
 mod sendtables;
 mod variant;
 
@@ -53,6 +55,7 @@ pub struct FirstPassOutput {
     pub info: crate::csgo_proto::CDemoFileInfo,
     pub events: Vec<DemoEvent>,
     pub player_info: std::collections::HashMap<UserId, Player>,
+    pub entity_states: Vec<entities::EntityState>,
 }
 
 #[derive(Debug)]
@@ -85,16 +88,21 @@ where
         mapping: std::collections::HashMap::new(),
     };
     let mut player_info = std::collections::HashMap::new();
-    let mut entities = std::collections::HashMap::new();
-    let mut cls_to_class = std::collections::HashMap::<u32, Class>::new();
+    let mut entity_ctx = entities::EntityContext {
+        entities: std::collections::HashMap::new(),
+        cls_to_class: std::collections::HashMap::new(),
+    };
     let mut paths = Paths::new();
     let mut qf_mapper = decoder::QfMapper {
         idx: 0,
         map: std::collections::HashMap::new(),
     };
+    let mut prop_controller = propcontroller::PropController::new();
     let mut serializers = std::collections::HashMap::new();
 
     let mut baselines = std::collections::HashMap::new();
+
+    let mut entity_states = Vec::new();
 
     for mut frame in frames.into_iter() {
         frame
@@ -117,11 +125,12 @@ where
                     &mut events,
                     &mut event_mapping,
                     &mut player_info,
-                    &mut entities,
-                    &mut cls_to_class,
+                    &mut entity_ctx,
                     &mut paths,
                     &mut qf_mapper,
                     &mut baselines,
+                    &prop_controller,
+                    &mut entity_states
                 )?;
             }
             DemoCommand::FullPacket => {
@@ -130,11 +139,12 @@ where
                     &mut events,
                     &mut event_mapping,
                     &mut player_info,
-                    &mut entities,
-                    &mut cls_to_class,
+                    &mut entity_ctx,
                     &mut paths,
                     &mut qf_mapper,
                     &mut baselines,
+                    &prop_controller,
+                    &mut entity_states
                 )?;
             }
             // TODO
@@ -166,19 +176,23 @@ where
                 // std::fs::write("send_table.b", bytes.as_slice());
 
                 assert!(serializers.is_empty());
-                serializers = sendtables::get_serializers(&serializer_msg, &mut qf_mapper)?;
+                serializers = sendtables::get_serializers(
+                    &serializer_msg,
+                    &mut qf_mapper,
+                    &mut prop_controller,
+                )?;
             }
             DemoCommand::ClassInfo => {
                 let raw: crate::csgo_proto::CDemoClassInfo = prost::Message::decode(data)?;
 
-                cls_to_class.clear();
+                entity_ctx.cls_to_class.clear();
 
                 for class_t in raw.classes {
                     let cls_id = class_t.class_id();
                     let network_name = class_t.network_name();
 
                     if let Some(ser) = serializers.remove(network_name) {
-                        cls_to_class.insert(
+                        entity_ctx.cls_to_class.insert(
                             cls_id as u32,
                             Class {
                                 name: network_name.to_owned(),
@@ -203,6 +217,7 @@ where
         info,
         events,
         player_info,
+        entity_states,
     })
 }
 
@@ -211,11 +226,12 @@ fn parse_fullpacket(
     events: &mut Vec<DemoEvent>,
     event_mapper: &mut GameEventMapping,
     player_info: &mut std::collections::HashMap<UserId, Player>,
-    entities: &mut std::collections::HashMap<i32, Entity>,
-    cls_to_class: &mut std::collections::HashMap<u32, Class>,
+    entity_ctx: &mut entities::EntityContext,
     paths: &mut Paths,
     qf_mapper: &mut decoder::QfMapper,
     baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
+    prop_controller: &propcontroller::PropController,
+    entity_states: &mut Vec<entities::EntityState>
 ) -> Result<(), FirstPassError> {
     let raw: crate::csgo_proto::CDemoFullPacket = prost::Message::decode(data)?;
 
@@ -232,11 +248,12 @@ fn parse_fullpacket(
                 events,
                 event_mapper,
                 player_info,
-                entities,
-                cls_to_class,
+                entity_ctx,
                 paths,
                 qf_mapper,
                 baselines,
+                prop_controller,
+                entity_states
             )?;
 
             Ok(())
@@ -250,11 +267,12 @@ fn parse_packet(
     events: &mut Vec<DemoEvent>,
     event_mapper: &mut GameEventMapping,
     player_info: &mut std::collections::HashMap<UserId, Player>,
-    entities: &mut std::collections::HashMap<i32, Entity>,
-    cls_to_class: &mut std::collections::HashMap<u32, Class>,
+    entity_ctx: &mut entities::EntityContext,
     paths: &mut Paths,
     qf_mapper: &mut decoder::QfMapper,
     baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
+    prop_controller: &propcontroller::PropController,
+    entity_states: &mut Vec<entities::EntityState>
 ) -> Result<(), FirstPassError> {
     let raw: crate::csgo_proto::CDemoPacket = prost::Message::decode(data)?;
 
@@ -263,11 +281,12 @@ fn parse_packet(
         events,
         event_mapper,
         player_info,
-        entities,
-        cls_to_class,
+        entity_ctx,
         paths,
         qf_mapper,
         baselines,
+        prop_controller,
+        entity_states
     )?;
 
     Ok(())
@@ -278,11 +297,12 @@ fn inner_parse_packet(
     events: &mut Vec<DemoEvent>,
     event_mapper: &mut GameEventMapping,
     player_info: &mut std::collections::HashMap<UserId, Player>,
-    entities: &mut std::collections::HashMap<i32, Entity>,
-    cls_to_class: &mut std::collections::HashMap<u32, Class>,
+    entity_ctx: &mut entities::EntityContext,
     paths: &mut Paths,
     qf_mapper: &mut decoder::QfMapper,
     baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
+    prop_controller: &propcontroller::PropController,
+    entity_states: &mut Vec<entities::EntityState>
 ) -> Result<(), FirstPassError> {
     let mut bitreader = crate::bitreader::Bitreader::new(raw.data());
 
@@ -347,34 +367,32 @@ fn inner_parse_packet(
 
                     match bitreader.read_nbits(2)? {
                         0b01 | 0b11 => {
-                            entities.remove(&entity_id);
+                            entity_ctx.entities.remove(&entity_id);
                         }
                         0b10 => {
-                            let (id, entity) = create_entity(entity_id, &mut bitreader, baselines)?;
-                            let cls = entity.cls;
-
-                            entities.insert(entity_id, entity);
+                            let cls = entity_ctx.create_entity(entity_id, &mut bitreader)?;
+                            
                             if let Some(baseline_bytes) = baselines.get(&cls) {
                                 let mut br = crate::bitreader::Bitreader::new(&baseline_bytes);
-                                update_entity(
+                                let state = update_entity(
                                     entity_id,
                                     &mut br,
-                                    entities,
-                                    cls_to_class,
+                                    entity_ctx,
                                     paths,
                                     qf_mapper,
+                                    prop_controller,
                                 )?;
                             }
 
-
-                            update_entity(
+                            let state = update_entity(
                                 entity_id,
                                 &mut bitreader,
-                                entities,
-                                cls_to_class,
+                                entity_ctx,
                                 paths,
                                 qf_mapper,
+                                prop_controller,
                             )?;
+                            entity_states.push(state);
                         }
                         0b00 => {
                             if raw.has_pvs_vis_bits() > 0 {
@@ -383,22 +401,21 @@ fn inner_parse_packet(
                                 }
                             }
 
-                            update_entity(
+                            let state = update_entity(
                                 entity_id,
                                 &mut bitreader,
-                                entities,
-                                cls_to_class,
+                                entity_ctx,
                                 paths,
                                 qf_mapper,
+                                prop_controller,
                             )?;
+                            entity_states.push(state);
                         }
                         unknown => {
                             panic!("{:?}", unknown);
                         }
                     };
                 }
-
-                // dbg!("PacketEntities");
             }
             crate::netmessagetypes::NetmessageType::svc_UserCmds => {}
             crate::netmessagetypes::NetmessageType::GE_SosStartSoundEvent => {}
@@ -482,84 +499,30 @@ fn inner_parse_packet(
     Ok(())
 }
 
-fn create_entity(
-    entity_id: i32,
-    bitreader: &mut crate::bitreader::Bitreader,
-    baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
-) -> Result<(i32, Entity), FirstPassError> {
-    let cls_id: u32 = bitreader.read_nbits(8)?;
-    let _serial = bitreader.read_nbits(17)?;
-    let _unknown = bitreader.read_varint()?;
-
-    Ok((entity_id, Entity { cls: cls_id }))
-}
-
 fn update_entity(
     entity_id: i32,
     bitreader: &mut crate::bitreader::Bitreader,
-    entities: &mut std::collections::HashMap<i32, Entity>,
-    cls_to_class: &mut std::collections::HashMap<u32, Class>,
+    entity_ctx: &mut entities::EntityContext,
     paths: &mut Paths,
     qf_mapper: &mut decoder::QfMapper,
-) -> Result<(), FirstPassError> {
+    prop_controller: &propcontroller::PropController,
+) -> Result<entities::EntityState, FirstPassError> {
     let n_updates = fieldpath::parse_paths(bitreader, paths)?;
-    let n_updated_values = decode_entity_update(
+    let (n_updated_values, entity_state) = entity_ctx.decode_entity_update(
         entity_id,
         bitreader,
         n_updates,
-        entities,
-        cls_to_class,
         paths,
         qf_mapper,
+        prop_controller,
     )?;
     if n_updated_values > 0 {
-        gather_extra_info()?;
+        // TODO
+        // Gather extra information
+        // gather_extra_info(entity_id, prop_controller)?;
     }
 
-    Ok(())
-}
-
-fn gather_extra_info() -> Result<(), FirstPassError> {
-    // TODO
-
-    Ok(())
-}
-
-fn decode_entity_update(
-    entity_id: i32,
-    bitreader: &mut crate::bitreader::Bitreader,
-    n_updates: usize,
-    entities: &mut std::collections::HashMap<i32, Entity>,
-    cls_to_class: &mut std::collections::HashMap<u32, Class>,
-    paths: &mut Paths,
-    qf_mapper: &mut decoder::QfMapper,
-) -> Result<usize, FirstPassError> {
-    let entity = match entities.get_mut(&entity_id) {
-        Some(e) => e,
-        None => panic!("ID: {:?} - Entities: {:?}", entity_id, entities),
-    };
-    let class = match cls_to_class.get_mut(&entity.cls) {
-        Some(c) => c,
-        None => panic!(),
-    };
-
-    // dbg!(&class.name);
-    for path in paths.paths().take(n_updates) {
-        // dbg!(&path);
-
-        let field = path.find(&class.serializer)?;
-        let field_info = field.get_propinfo(path);
-        let decoder = field.get_decoder()?;
-        let result = decoder.decode(bitreader, qf_mapper)?;
-
-        // dbg!(&field, &field_info, &decoder, &result);
-
-        if let Some(fi) = field_info {
-            // dbg!(&fi);
-        }
-    }
-
-    Ok(n_updates)
+    Ok(entity_state)
 }
 
 static HUFFMAN_LOOKUP_TABLE: std::sync::LazyLock<Vec<(u8, u8)>> = std::sync::LazyLock::new(|| {
@@ -570,54 +533,3 @@ static HUFFMAN_LOOKUP_TABLE: std::sync::LazyLock<Vec<(u8, u8)>> = std::sync::Laz
     }
     huf2
 });
-
-fn do_op(
-    symbol: u8,
-    bitreader: &mut crate::bitreader::Bitreader,
-    field_path: &mut FieldPath,
-) -> Result<(), FirstPassError> {
-    use fieldpath::ops::*;
-    
-    match symbol {
-        0 => plus_one(bitreader, field_path),
-        1 => plus_two(bitreader, field_path),
-        2 => plus_three(bitreader, field_path),
-        3 => plus_four(bitreader, field_path),
-        4 => plus_n(bitreader, field_path),
-        5 => push_one_left_delta_zero_right_zero(bitreader, field_path),
-        6 => push_one_left_delta_zero_right_non_zero(bitreader, field_path),
-        7 => push_one_left_delta_one_right_zero(bitreader, field_path),
-        8 => push_one_left_delta_one_right_non_zero(bitreader, field_path),
-        9 => push_one_left_delta_n_right_zero(bitreader, field_path),
-        10 => push_one_left_delta_n_right_non_zero(bitreader, field_path),
-        11 => push_one_left_delta_n_right_non_zero_pack6_bits(bitreader, field_path),
-        12 => push_one_left_delta_n_right_non_zero_pack8_bits(bitreader, field_path),
-        13 => push_two_left_delta_zero(bitreader, field_path),
-        14 => push_two_pack5_left_delta_zero(bitreader, field_path),
-        15 => push_three_left_delta_zero(bitreader, field_path),
-        16 => push_three_pack5_left_delta_zero(bitreader, field_path),
-        17 => push_two_left_delta_one(bitreader, field_path),
-        18 => push_two_pack5_left_delta_one(bitreader, field_path),
-        19 => push_three_left_delta_one(bitreader, field_path),
-        20 => push_three_pack5_left_delta_one(bitreader, field_path),
-        21 => push_two_left_delta_n(bitreader, field_path),
-        22 => push_two_pack5_left_delta_n(bitreader, field_path),
-        23 => push_three_left_delta_n(bitreader, field_path),
-        24 => push_three_pack5_left_delta_n(bitreader, field_path),
-        25 => push_n(bitreader, field_path),
-        26 => push_n_and_non_topological(bitreader, field_path),
-        27 => pop_one_plus_one(bitreader, field_path),
-        28 => pop_one_plus_n(bitreader, field_path),
-        29 => pop_all_but_one_plus_one(bitreader, field_path),
-        30 => pop_all_but_one_plus_n(bitreader, field_path),
-        31 => pop_all_but_one_plus_n_pack3_bits(bitreader, field_path),
-        32 => pop_all_but_one_plus_n_pack6_bits(bitreader, field_path),
-        33 => pop_n_plus_one(bitreader, field_path),
-        34 => pop_n_plus_n(bitreader, field_path),
-        35 => pop_n_and_non_topographical(bitreader, field_path),
-        36 => non_topo_complex(bitreader, field_path),
-        37 => non_topo_penultimate_plus_one(bitreader, field_path),
-        38 => non_topo_complex_pack4_bits(bitreader, field_path),
-        other => todo!("Other OP: {:?}", other),
-    }
-}
