@@ -9,7 +9,11 @@ fn mirage_1() {
     let frame_iter = csdemo::FrameIterator::parse(container.inner);
     assert_eq!(123333, frame_iter.count());
 
-    let output = csdemo::parser::parse(csdemo::FrameIterator::parse(container.inner)).unwrap();
+    let output = csdemo::parser::parse(
+        csdemo::FrameIterator::parse(container.inner),
+        csdemo::parser::EntityFilter::disabled(),
+    )
+    .unwrap();
 
     assert_eq!("de_mirage", output.header.map_name());
 
@@ -47,7 +51,11 @@ fn ancient_1() {
     let frame_iter = csdemo::FrameIterator::parse(container.inner);
     assert_eq!(116676, frame_iter.count());
 
-    let output = csdemo::parser::parse(csdemo::FrameIterator::parse(container.inner)).unwrap();
+    let output = csdemo::parser::parse(
+        csdemo::FrameIterator::parse(container.inner),
+        csdemo::parser::EntityFilter::disabled(),
+    )
+    .unwrap();
 
     assert_eq!("de_ancient", output.header.map_name());
 

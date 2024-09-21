@@ -3,6 +3,7 @@ use super::{decoder, propcontroller, Class, Entity, FirstPassError, Paths};
 pub struct EntityContext {
     pub entities: std::collections::HashMap<i32, Entity>,
     pub cls_to_class: std::collections::HashMap<u32, Class>,
+    pub filter: EntityFilter,
 }
 
 #[derive(Debug, Clone)]
@@ -19,16 +20,39 @@ pub struct EntityProp {
     pub value: super::variant::Variant,
 }
 
+pub struct EntityFilter {
+    pub enabled: bool,
+    entity: Box<dyn FnMut(&str) -> bool>,
+}
+
+impl EntityFilter {
+    pub fn all() -> Self {
+        Self {
+            enabled: true,
+            entity: Box::new(|_| true),
+        }
+    }
+
+    pub fn disabled() -> Self {
+        Self {
+            enabled: false,
+            entity: Box::new(|_| false),
+        }
+    }
+}
+
 impl EntityContext {
     /// Returns the `cls_id`
-    pub fn create_entity(&mut self, entity_id: i32, bitreader: &mut crate::bitreader::Bitreader) -> Result<u32, super::FirstPassError> {
+    pub fn create_entity(
+        &mut self,
+        entity_id: i32,
+        bitreader: &mut crate::bitreader::Bitreader,
+    ) -> Result<u32, super::FirstPassError> {
         let cls_id: u32 = bitreader.read_nbits(8)?;
         let _serial = bitreader.read_nbits(17)?;
         let _unknown = bitreader.read_varint()?;
 
-        self.entities.insert(entity_id, Entity {
-            cls: cls_id,
-        });
+        self.entities.insert(entity_id, Entity { cls: cls_id });
 
         Ok(cls_id)
     }
@@ -41,7 +65,7 @@ impl EntityContext {
         paths: &mut Paths,
         qf_mapper: &mut decoder::QfMapper,
         prop_controller: &propcontroller::PropController,
-    ) -> Result<(usize, EntityState), FirstPassError> {
+    ) -> Result<Option<(usize, EntityState)>, FirstPassError> {
         let entity = match self.entities.get_mut(&entity_id) {
             Some(e) => e,
             None => panic!("ID: {:?} - Entities: {:?}", entity_id, self.entities),
@@ -73,10 +97,17 @@ impl EntityContext {
             }
         }
 
-        Ok((n_updates, EntityState {
-            class: class.name.clone(),
-            cls: entity.cls,
-            props: fields,
-        }))
+        if !(self.filter.entity)(class.name.as_str()) {
+            return Ok(None);
+        }
+
+        Ok(Some((
+            n_updates,
+            EntityState {
+                class: class.name.clone(),
+                cls: entity.cls,
+                props: fields,
+            },
+        )))
     }
 }

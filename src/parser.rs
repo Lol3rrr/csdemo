@@ -9,6 +9,8 @@ mod propcontroller;
 mod sendtables;
 mod variant;
 
+pub use entities::EntityFilter;
+
 #[derive(Debug)]
 pub enum FirstPassError {
     DecompressFrame,
@@ -76,7 +78,7 @@ pub struct Class {
     serializer: sendtables::Serializer,
 }
 
-pub fn parse<'b, FI>(frames: FI) -> Result<FirstPassOutput, FirstPassError>
+pub fn parse<'b, FI>(frames: FI, filter: EntityFilter) -> Result<FirstPassOutput, FirstPassError>
 where
     FI: IntoIterator<Item = Frame<'b>>,
 {
@@ -91,6 +93,7 @@ where
     let mut entity_ctx = entities::EntityContext {
         entities: std::collections::HashMap::new(),
         cls_to_class: std::collections::HashMap::new(),
+        filter,
     };
     let mut paths = Paths::new();
     let mut qf_mapper = decoder::QfMapper {
@@ -130,7 +133,7 @@ where
                     &mut qf_mapper,
                     &mut baselines,
                     &prop_controller,
-                    &mut entity_states
+                    &mut entity_states,
                 )?;
             }
             DemoCommand::FullPacket => {
@@ -144,7 +147,7 @@ where
                     &mut qf_mapper,
                     &mut baselines,
                     &prop_controller,
-                    &mut entity_states
+                    &mut entity_states,
                 )?;
             }
             // TODO
@@ -231,7 +234,7 @@ fn parse_fullpacket(
     qf_mapper: &mut decoder::QfMapper,
     baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
     prop_controller: &propcontroller::PropController,
-    entity_states: &mut Vec<entities::EntityState>
+    entity_states: &mut Vec<entities::EntityState>,
 ) -> Result<(), FirstPassError> {
     let raw: crate::csgo_proto::CDemoFullPacket = prost::Message::decode(data)?;
 
@@ -253,7 +256,7 @@ fn parse_fullpacket(
                 qf_mapper,
                 baselines,
                 prop_controller,
-                entity_states
+                entity_states,
             )?;
 
             Ok(())
@@ -272,7 +275,7 @@ fn parse_packet(
     qf_mapper: &mut decoder::QfMapper,
     baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
     prop_controller: &propcontroller::PropController,
-    entity_states: &mut Vec<entities::EntityState>
+    entity_states: &mut Vec<entities::EntityState>,
 ) -> Result<(), FirstPassError> {
     let raw: crate::csgo_proto::CDemoPacket = prost::Message::decode(data)?;
 
@@ -286,7 +289,7 @@ fn parse_packet(
         qf_mapper,
         baselines,
         prop_controller,
-        entity_states
+        entity_states,
     )?;
 
     Ok(())
@@ -302,7 +305,7 @@ fn inner_parse_packet(
     qf_mapper: &mut decoder::QfMapper,
     baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
     prop_controller: &propcontroller::PropController,
-    entity_states: &mut Vec<entities::EntityState>
+    entity_states: &mut Vec<entities::EntityState>,
 ) -> Result<(), FirstPassError> {
     let mut bitreader = crate::bitreader::Bitreader::new(raw.data());
 
@@ -360,61 +363,67 @@ fn inner_parse_packet(
                 let raw: crate::csgo_proto::CsvcMsgPacketEntities =
                     prost::Message::decode(msg_bytes.as_slice())?;
 
-                let mut bitreader = crate::bitreader::Bitreader::new(raw.entity_data());
-                let mut entity_id: i32 = -1;
-                for _ in 0..raw.updated_entries() {
-                    entity_id += 1 + (bitreader.read_u_bit_var()? as i32);
+                if entity_ctx.filter.enabled {
+                    let mut bitreader = crate::bitreader::Bitreader::new(raw.entity_data());
+                    let mut entity_id: i32 = -1;
+                    for _ in 0..raw.updated_entries() {
+                        entity_id += 1 + (bitreader.read_u_bit_var()? as i32);
 
-                    match bitreader.read_nbits(2)? {
-                        0b01 | 0b11 => {
-                            entity_ctx.entities.remove(&entity_id);
-                        }
-                        0b10 => {
-                            let cls = entity_ctx.create_entity(entity_id, &mut bitreader)?;
-                            
-                            if let Some(baseline_bytes) = baselines.get(&cls) {
-                                let mut br = crate::bitreader::Bitreader::new(&baseline_bytes);
+                        match bitreader.read_nbits(2)? {
+                            0b01 | 0b11 => {
+                                entity_ctx.entities.remove(&entity_id);
+                            }
+                            0b10 => {
+                                let cls = entity_ctx.create_entity(entity_id, &mut bitreader)?;
+
+                                if let Some(baseline_bytes) = baselines.get(&cls) {
+                                    let mut br = crate::bitreader::Bitreader::new(&baseline_bytes);
+                                    let state = update_entity(
+                                        entity_id,
+                                        &mut br,
+                                        entity_ctx,
+                                        paths,
+                                        qf_mapper,
+                                        prop_controller,
+                                    )?;
+                                }
+
                                 let state = update_entity(
                                     entity_id,
-                                    &mut br,
+                                    &mut bitreader,
                                     entity_ctx,
                                     paths,
                                     qf_mapper,
                                     prop_controller,
                                 )?;
-                            }
-
-                            let state = update_entity(
-                                entity_id,
-                                &mut bitreader,
-                                entity_ctx,
-                                paths,
-                                qf_mapper,
-                                prop_controller,
-                            )?;
-                            entity_states.push(state);
-                        }
-                        0b00 => {
-                            if raw.has_pvs_vis_bits() > 0 {
-                                if bitreader.read_nbits(2)? & 0x01 == 1 {
-                                    continue;
+                                if let Some(state) = state {
+                                    entity_states.push(state);
                                 }
                             }
+                            0b00 => {
+                                if raw.has_pvs_vis_bits() > 0 {
+                                    if bitreader.read_nbits(2)? & 0x01 == 1 {
+                                        continue;
+                                    }
+                                }
 
-                            let state = update_entity(
-                                entity_id,
-                                &mut bitreader,
-                                entity_ctx,
-                                paths,
-                                qf_mapper,
-                                prop_controller,
-                            )?;
-                            entity_states.push(state);
-                        }
-                        unknown => {
-                            panic!("{:?}", unknown);
-                        }
-                    };
+                                let state = update_entity(
+                                    entity_id,
+                                    &mut bitreader,
+                                    entity_ctx,
+                                    paths,
+                                    qf_mapper,
+                                    prop_controller,
+                                )?;
+                                if let Some(state) = state {
+                                    entity_states.push(state);
+                                }
+                            }
+                            unknown => {
+                                panic!("{:?}", unknown);
+                            }
+                        };
+                    }
                 }
             }
             crate::netmessagetypes::NetmessageType::svc_UserCmds => {}
@@ -506,23 +515,26 @@ fn update_entity(
     paths: &mut Paths,
     qf_mapper: &mut decoder::QfMapper,
     prop_controller: &propcontroller::PropController,
-) -> Result<entities::EntityState, FirstPassError> {
+) -> Result<Option<entities::EntityState>, FirstPassError> {
     let n_updates = fieldpath::parse_paths(bitreader, paths)?;
-    let (n_updated_values, entity_state) = entity_ctx.decode_entity_update(
+    let (n_updated_values, entity_state) = match entity_ctx.decode_entity_update(
         entity_id,
         bitreader,
         n_updates,
         paths,
         qf_mapper,
         prop_controller,
-    )?;
+    )? {
+        Some(s) => s,
+        None => return Ok(None),
+    };
     if n_updated_values > 0 {
         // TODO
         // Gather extra information
         // gather_extra_info(entity_id, prop_controller)?;
     }
 
-    Ok(entity_state)
+    Ok(Some(entity_state))
 }
 
 static HUFFMAN_LOOKUP_TABLE: std::sync::LazyLock<Vec<(u8, u8)>> = std::sync::LazyLock::new(|| {
