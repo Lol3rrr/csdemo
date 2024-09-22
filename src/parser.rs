@@ -107,11 +107,9 @@ where
 
     let mut entity_states = Vec::new();
 
-    for mut frame in frames.into_iter() {
-        frame
-            .decompress()
-            .map_err(|e| FirstPassError::DecompressFrame)?;
-        let data = frame.data().ok_or(FirstPassError::NoDataFrame)?;
+    let mut buffer = Vec::new();
+    for frame in frames.into_iter() {
+        let data = frame.decompress_with_buf(&mut buffer).map_err(|e| FirstPassError::DecompressFrame)?;
 
         match frame.cmd {
             DemoCommand::FileHeader => {

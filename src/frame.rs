@@ -39,6 +39,25 @@ impl<'b> Frame<'b> {
         Some(self.inner.as_ref())
     }
 
+    pub fn decompress_with_buf<'s, 'buf>(&'s self, buf: &'b mut Vec<u8>) -> Result<&'buf [u8], ()> where 's: 'buf {
+        if !self.compressed {
+            return Ok(&self.inner);
+        }
+
+        let uncompressed_len = snap::raw::decompress_len(&self.inner).map_err(|e| {
+            println!("Getting decompress len");
+            ()
+        })?;
+        buf.resize(uncompressed_len, 0);
+
+        snap::raw::Decoder::new().decompress(&self.inner, buf.as_mut_slice()).map_err(|e| {
+            println!("Decompressing");
+            ()
+        })?;
+
+        Ok(buf.as_slice())
+    }
+
     pub fn decompress(&mut self) -> Result<(), ()> {
         if !self.compressed {
             return Ok(());
