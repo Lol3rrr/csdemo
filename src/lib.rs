@@ -2,7 +2,7 @@ mod container;
 pub use container::{Container, ParseContainerError};
 
 mod frame;
-pub use frame::{Frame, FrameIterator};
+pub use frame::{Frame, FrameIterator, FrameDecompressError, FrameParseError};
 
 mod democmd;
 pub use democmd::DemoCommand;

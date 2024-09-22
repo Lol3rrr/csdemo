@@ -182,25 +182,19 @@ impl QuantalizedFloat {
                 steps = 1 << qf.bit_count;
             }
             qf.offset = range_2 as f32 / steps as f32;
-            qf.high = qf.low + ((range_2 as f32 - qf.offset) as f32);
+            qf.high = qf.low + (range_2 as f32 - qf.offset);
         }
 
         qf.assign_multipliers(steps);
 
-        if (qf.flags & QFF_ROUNDDOWN) != 0 {
-            if qf.quantize(qf.low) == qf.low {
-                qf.flags &= !QFF_ROUNDDOWN;
-            }
+        if (qf.flags & QFF_ROUNDDOWN) != 0 && qf.quantize(qf.low) == qf.low {
+            qf.flags &= !QFF_ROUNDDOWN;
         }
-        if (qf.flags & QFF_ROUNDUP) != 0 {
-            if qf.quantize(qf.high) == qf.high {
-                qf.flags &= !QFF_ROUNDUP
-            }
+        if (qf.flags & QFF_ROUNDUP) != 0 && qf.quantize(qf.high) == qf.high {
+            qf.flags &= !QFF_ROUNDUP
         }
-        if (qf.flags & QFF_ENCODE_ZERO) != 0 {
-            if qf.quantize(0.0) == 0.0 {
-                qf.flags &= !QFF_ENCODE_ZERO;
-            }
+        if (qf.flags & QFF_ENCODE_ZERO) != 0 && qf.quantize(0.0) == 0.0 {
+            qf.flags &= !QFF_ENCODE_ZERO;
         }
 
         qf

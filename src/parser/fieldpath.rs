@@ -7,6 +7,12 @@ pub struct FieldPath {
     pub last: usize,
 }
 
+impl Default for Paths {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Paths {
     pub fn new() -> Self {
         Self(Vec::new())

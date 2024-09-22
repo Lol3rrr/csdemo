@@ -1,4 +1,4 @@
-use crate::{packet::DemoEvent, DemoCommand, Frame, UserId};
+use crate::{packet::DemoEvent, DemoCommand, Frame, UserId, FrameDecompressError};
 
 mod fieldpath;
 pub use fieldpath::{FieldPath, Paths};
@@ -13,7 +13,7 @@ pub use entities::EntityFilter;
 
 #[derive(Debug)]
 pub enum FirstPassError {
-    DecompressFrame,
+    DecompressFrame(FrameDecompressError),
     NoDataFrame,
     DecodeProtobuf(prost::DecodeError),
     MissingFileHeader,
@@ -73,7 +73,6 @@ struct GameEventMapping {
 
 #[derive(Debug)]
 pub struct Class {
-    class_id: i32,
     name: String,
     serializer: sendtables::Serializer,
 }
@@ -111,7 +110,7 @@ where
     for frame in frames.into_iter() {
         let data = frame
             .decompress_with_buf(&mut buffer)
-            .map_err(|e| FirstPassError::DecompressFrame)?;
+            .map_err(FirstPassError::DecompressFrame)?;
 
         match frame.cmd {
             DemoCommand::FileHeader => {
@@ -205,7 +204,6 @@ where
                             cls_id as u32,
                             Class {
                                 name: network_name.to_owned(),
-                                class_id: cls_id,
                                 serializer: ser,
                             },
                         );
@@ -235,7 +233,7 @@ fn parse_fullpacket(data: &[u8]) -> Result<Option<crate::csgo_proto::CDemoPacket
 
     // TODO
     // Handle string table stuff
-    for item in raw.string_table.iter().flat_map(|st| st.tables.iter()) {
+    for _item in raw.string_table.iter().flat_map(|st| st.tables.iter()) {
         // dbg!(&item.table_name);
     }
 
@@ -324,8 +322,11 @@ fn inner_parse_packet(
                                 let cls = entity_ctx.create_entity(entity_id, &mut bitreader)?;
 
                                 if let Some(baseline_bytes) = baselines.get(&cls) {
-                                    let mut br = crate::bitreader::Bitreader::new(&baseline_bytes);
-                                    let state = update_entity(
+                                    let mut br = crate::bitreader::Bitreader::new(baseline_bytes);
+                                    
+                                    // TODO
+                                    // How should we handle is this?
+                                    let _state = update_entity(
                                         entity_id,
                                         &mut br,
                                         entity_ctx,
@@ -348,10 +349,8 @@ fn inner_parse_packet(
                                 }
                             }
                             0b00 => {
-                                if raw.has_pvs_vis_bits() > 0 {
-                                    if bitreader.read_nbits(2)? & 0x01 == 1 {
-                                        continue;
-                                    }
+                                if raw.has_pvs_vis_bits() > 0 && bitreader.read_nbits(2)? & 0x01 == 1 {
+                                    continue;
                                 }
 
                                 let state = update_entity(
@@ -385,7 +384,7 @@ fn inner_parse_packet(
 
                 match event_mapper.mapping.get(&raw.eventid()) {
                     Some((name, keys)) => {
-                        match crate::game_event::EVENT_PARSERS.get(&name) {
+                        match crate::game_event::EVENT_PARSERS.get(name) {
                             Some(parser) => {
                                 let parsed = parser.parse(keys.as_slice(), raw.clone())?;
 
@@ -419,11 +418,6 @@ fn inner_parse_packet(
             crate::netmessagetypes::NetmessageType::CS_UM_RadioText => {}
             crate::netmessagetypes::NetmessageType::TE_WorldDecal => {}
             crate::netmessagetypes::NetmessageType::TE_EffectDispatch => {}
-            crate::netmessagetypes::NetmessageType::CS_UM_PlayerStatsUpdate => {
-                let raw: crate::csgo_proto::CcsUsrMsgPlayerStatsUpdate =
-                    prost::Message::decode(msg_bytes.as_slice())?;
-                // dbg!(&raw);
-            }
             crate::netmessagetypes::NetmessageType::CS_UM_EndOfMatchAllPlayersData => {
                 let raw: crate::csgo_proto::CcsUsrMsgEndOfMatchAllPlayersData =
                     prost::Message::decode(msg_bytes.as_slice())?;

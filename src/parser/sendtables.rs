@@ -1,8 +1,5 @@
 use super::decoder;
 
-#[derive(Debug)]
-pub enum ParseSendTables {}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct Serializer {
     pub name: String,
@@ -138,7 +135,7 @@ fn generate_field_data(
 ) -> Result<ConstructorField, super::FirstPassError> {
     let name = msg.symbols.get(field.var_type_sym() as usize).unwrap();
 
-    let ft = find_field_type(&name, field_type_map)?;
+    let ft = find_field_type(name, field_type_map)?;
     let mut field = field_from_msg(field, msg, ft.clone())?;
 
     field.category = find_category(&field);
@@ -166,7 +163,7 @@ fn generate_field_data(
 
 fn generate_serializer(
     serializer: &crate::csgo_proto::ProtoFlattenedSerializerT,
-    field_data: &mut Vec<Option<ConstructorField>>,
+    field_data: &mut [Option<ConstructorField>],
     msg: &crate::csgo_proto::CsvcMsgFlattenedSerializer,
     serializers: &mut std::collections::HashMap<String, Serializer>,
 ) -> Result<Serializer, super::FirstPassError> {
@@ -188,7 +185,7 @@ fn generate_serializer(
         };
 
         if f.field_enum_type.is_none() {
-            f.field_enum_type = Some(create_field(&symbol, f, serializers)?);
+            f.field_enum_type = Some(create_field(f, serializers)?);
         }
         if let Some(Some(f)) = &field_data.get(fi) {
             if let Some(field) = &f.field_enum_type {
@@ -221,6 +218,7 @@ pub enum FieldCategory {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ConstructorField {
     pub var_name: String,
     pub var_type: String,
@@ -245,7 +243,7 @@ static RE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
     regex::Regex::new(r"([^<\[\*]+)(<\s(.*)\s>)?(\*)?(\[(.*)\])?").unwrap()
 });
 
-const POINTER_TYPES: &'static [&'static str] = &[
+const POINTER_TYPES: &[&str] = &[
     "CBodyComponent",
     "CLightComponent",
     "CPhysicsComponent",
@@ -417,7 +415,7 @@ impl FieldType {
 
         if let Some(gt) = self.generic_type.as_ref() {
             s += "< ";
-            s += &FieldType::to_string(&gt, true);
+            s += &FieldType::to_string(gt, true);
             s += "< ";
         }
         if self.pointer {
@@ -450,7 +448,6 @@ fn for_string(
 }
 
 fn create_field(
-    symbol: &String,
     fd: &mut ConstructorField,
     serializers: &mut std::collections::HashMap<String, Serializer>,
 ) -> Result<Field, super::FirstPassError> {
@@ -578,7 +575,8 @@ impl Field {
                 fi.prop_id = ITEM_PURCHASE_NEW_DEF_IDX + path.path[2] as u32;
             }
         }
-        return Some(fi);
+
+        Some(fi)
     }
 
     pub fn get_decoder(&self) -> Result<decoder::Decoder, super::FirstPassError> {

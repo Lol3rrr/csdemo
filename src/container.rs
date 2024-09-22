@@ -9,6 +9,9 @@ pub enum ParseContainerError {
     Other(&'static str),
 }
 
+/// A Container models the outer layer of a CS2 demo, which starts with a specific magic string and
+/// some other values. Then it just stores the raw bytes afterwards, that contain the actual demo
+/// data
 #[derive(Debug)]
 pub struct Container<'b> {
     pub magic: &'b str,
@@ -16,6 +19,7 @@ pub struct Container<'b> {
 }
 
 impl<'b> Container<'b> {
+    /// Attempts to parse the given bytes into a valid cs2 demo container
     pub fn parse<'ib>(input: &'ib [u8]) -> Result<Self, ParseContainerError>
     where
         'ib: 'b,
@@ -25,7 +29,7 @@ impl<'b> Container<'b> {
         }
 
         let magic =
-            core::str::from_utf8(&input[..8]).map_err(|e| ParseContainerError::InvalidMagic(e))?;
+            core::str::from_utf8(&input[..8]).map_err(ParseContainerError::InvalidMagic)?;
         let raw_len: [u8; 4] = input[8..12]
             .try_into()
             .expect("We know that the input buffer is at least 16 bytes large");

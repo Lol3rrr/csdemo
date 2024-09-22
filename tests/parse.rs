@@ -18,25 +18,19 @@ fn mirage_1() {
     assert_eq!("de_mirage", output.header.map_name());
 
     for event in output.events.iter() {
-        match event {
-            DemoEvent::GameEvent(gevent) => match gevent {
-                GameEvent::PlayerDeath(death) => {
-                    assert!(
-                        death.remaining.is_empty(),
-                        "Remaining for PlayerDeath: {:?}",
-                        death.remaining
-                    );
+        if let DemoEvent::GameEvent(gevent) = event { if let GameEvent::PlayerDeath(death) = gevent {
+            assert!(
+                death.remaining.is_empty(),
+                "Remaining for PlayerDeath: {:?}",
+                death.remaining
+            );
 
-                    let died_user = output
-                        .player_info
-                        .get(death.userid.as_ref().unwrap())
-                        .unwrap();
-                    // dbg!(died_user);
-                }
-                _ => {}
-            },
-            _ => {}
-        };
+            let died_user = output
+                .player_info
+                .get(death.userid.as_ref().unwrap())
+                .unwrap();
+            // dbg!(died_user);
+        } };
     }
 
     todo!()

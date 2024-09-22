@@ -5,20 +5,33 @@ pub struct Frame<'b> {
     pub inner: std::borrow::Cow<'b, [u8]>,
 }
 
+#[derive(Debug)]
+pub enum FrameParseError {
+    ParseVarint(()),
+    NotEnoughBytes,
+    ParseDemoCommand(i32),
+}
+
+#[derive(Debug)]
+pub enum FrameDecompressError {
+    GettingDecompressedLength(snap::Error),
+    Decompressing(snap::Error),
+}
+
 impl<'b> Frame<'b> {
-    pub fn parse<'ib>(input: &'ib [u8]) -> Result<(&'ib [u8], Self), ()>
+    pub fn parse<'ib>(input: &'ib [u8]) -> Result<(&'ib [u8], Self), FrameParseError>
     where
         'ib: 'b,
     {
-        let (input, raw_cmd) = crate::varint::parse_varint(input)?;
-        let (input, tick) = crate::varint::parse_varint(input)?;
-        let (input, size) = crate::varint::parse_varint(input)?;
+        let (input, raw_cmd) = crate::varint::parse_varint(input).map_err(FrameParseError::ParseVarint)?;
+        let (input, tick) = crate::varint::parse_varint(input).map_err(FrameParseError::ParseVarint)?;
+        let (input, size) = crate::varint::parse_varint(input).map_err(FrameParseError::ParseVarint)?;
 
         if input.len() < size as usize {
-            return Err(());
+            return Err(FrameParseError::NotEnoughBytes);
         }
 
-        let demo_cmd = crate::DemoCommand::try_from((raw_cmd & !64) as i32).map_err(|e| ())?;
+        let demo_cmd = crate::DemoCommand::try_from((raw_cmd & !64) as i32).map_err(FrameParseError::ParseDemoCommand)?;
 
         Ok((
             &input[size as usize..],
@@ -39,7 +52,7 @@ impl<'b> Frame<'b> {
         Some(self.inner.as_ref())
     }
 
-    pub fn decompress_with_buf<'s, 'buf>(&'s self, buf: &'b mut Vec<u8>) -> Result<&'buf [u8], ()>
+    pub fn decompress_with_buf<'s, 'buf>(&'s self, buf: &'b mut Vec<u8>) -> Result<&'buf [u8], FrameDecompressError>
     where
         's: 'buf,
     {
@@ -48,29 +61,27 @@ impl<'b> Frame<'b> {
         }
 
         let uncompressed_len = snap::raw::decompress_len(&self.inner).map_err(|e| {
-            println!("Getting decompress len");
-            ()
+            FrameDecompressError::GettingDecompressedLength(e)
         })?;
         buf.resize(uncompressed_len, 0);
 
         snap::raw::Decoder::new()
             .decompress(&self.inner, buf.as_mut_slice())
             .map_err(|e| {
-                println!("Decompressing");
-                ()
+                FrameDecompressError::Decompressing(e)
             })?;
 
         Ok(buf.as_slice())
     }
 
-    pub fn decompress(&mut self) -> Result<(), ()> {
+    pub fn decompress(&mut self) -> Result<(), FrameDecompressError> {
         if !self.compressed {
             return Ok(());
         }
 
         let decompressed = snap::raw::Decoder::new()
-            .decompress_vec(&self.inner.as_ref())
-            .map_err(|e| ())?;
+            .decompress_vec(self.inner.as_ref())
+            .map_err(FrameDecompressError::Decompressing)?;
 
         self.compressed = false;
         self.inner = std::borrow::Cow::Owned(decompressed);

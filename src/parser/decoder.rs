@@ -89,7 +89,7 @@ pub fn find_decoder(field: &super::sendtables::ConstructorField, qf_map: &mut Qf
     }
 
     match BASETYPE_DECODERS.get(field.field_type.base_type.as_str()) {
-        Some(d) => d.clone(),
+        Some(d) => *d,
         None => match field.field_type.base_type.as_str() {
             "float32" => float_decoder(field, qf_map),
             "Vector" => find_vector_type(3, field, qf_map),
@@ -138,7 +138,7 @@ fn float_decoder(field: &super::sendtables::ConstructorField, qf_map: &mut QfMap
         "m_flSimulationTime" => Decoder::FloatSimulationTimeDecoder,
         _ => {
             if field.bitcount <= 0 || field.bitcount >= 32 {
-                return Decoder::NoscaleDecoder;
+                Decoder::NoscaleDecoder
             } else {
                 let qf = QuantalizedFloat::new(
                     field.bitcount as u32,
@@ -213,7 +213,7 @@ impl Decoder {
 
 impl<'b> crate::bitreader::Bitreader<'b> {
     pub fn read_bit_coord_pres(&mut self) -> Result<f32, super::FirstPassError> {
-        return Ok(self.read_nbits(20)? as f32 * 360.0 / (1 << 20) as f32 - 180.0);
+        Ok(self.read_nbits(20)? as f32 * 360.0 / (1 << 20) as f32 - 180.0)
     }
 
     pub fn decode_qfloat(
@@ -232,7 +232,7 @@ impl<'b> crate::bitreader::Bitreader<'b> {
         if ammo > 0 {
             return Ok(ammo - 1);
         }
-        return Ok(ammo);
+        Ok(ammo)
     }
 
     pub fn decode_uint64(&mut self) -> Result<u64, super::FirstPassError> {
@@ -306,7 +306,7 @@ impl<'b> crate::bitreader::Bitreader<'b> {
         Ok(v)
     }
     pub fn read_angle(&mut self, n: usize) -> Result<f32, super::FirstPassError> {
-        return Ok(self.decode_noscale()? / ((1 << n) as f32));
+        Ok(self.decode_noscale()? / ((1 << n) as f32))
     }
 
     pub fn decode_normal(&mut self) -> Result<f32, super::FirstPassError> {
@@ -331,7 +331,7 @@ impl<'b> crate::bitreader::Bitreader<'b> {
         let neg_z = self.read_boolean()?;
         let prod_sum = v[0] * v[0] + v[1] * v[1];
         if prod_sum < 1.0 {
-            v[2] = (1.0 - prod_sum).sqrt() as f32;
+            v[2] = (1.0 - prod_sum).sqrt();
         } else {
             v[2] = 0.0;
         }

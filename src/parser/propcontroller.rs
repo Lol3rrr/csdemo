@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub const PLAYER_ENTITY_HANDLE_MISSING: i32 = 2047;
 pub const SPECTATOR_TEAM_NUM: u32 = 1;
 pub const BUTTONS_BASEID: u32 = 100000;
@@ -136,11 +138,8 @@ impl PropController {
                         path.clone(),
                     );
                 }
-                Field::Array(ser) => match &mut ser.field_enum.as_mut() {
-                    Field::Value(v) => {
-                        self.handle_prop(&(ser_name.clone() + "." + &v.name), v, path);
-                    }
-                    _ => {}
+                Field::Array(ser) => if let Field::Value(v) = &mut ser.field_enum.as_mut() {
+                    self.handle_prop(&(ser_name.clone() + "." + &v.name), v, path);
                 },
                 Field::Vector(_x) => {
                     let vec_path = path.clone();
@@ -150,17 +149,14 @@ impl PropController {
                                 for (inner_idx, f) in
                                     &mut s.serializer.fields.iter_mut().enumerate()
                                 {
-                                    match f {
-                                        Field::Value(v) => {
-                                            let mut myp = vec_path.clone();
-                                            myp.push(inner_idx as i32);
-                                            self.handle_prop(
-                                                &(ser_name.clone() + "." + &v.name),
-                                                v,
-                                                myp,
-                                            );
-                                        }
-                                        _ => {}
+                                    if let Field::Value(v) = f {
+                                        let mut myp = vec_path.clone();
+                                        myp.push(inner_idx as i32);
+                                        self.handle_prop(
+                                            &(ser_name.clone() + "." + &v.name),
+                                            v,
+                                            myp,
+                                        );
                                     }
                                 }
                                 self.traverse_fields(
@@ -219,53 +215,50 @@ impl PropController {
         self.path_to_name.insert(a, prop_name.to_string());
 
         let prop_already_exists = self.name_to_id.contains_key(&(prop_name).to_string());
-        self.set_id(&prop_name, f, is_grenade_or_weapon);
+        self.set_id(&prop_name, f);
         if !prop_already_exists {
             self.insert_propinfo(&prop_name, f);
         }
         f.should_parse = true;
         if full_name == "CCSPlayerPawn.CCSPlayer_WeaponServices.m_hMyWeapons" {
-            f.prop_id = MY_WEAPONS_OFFSET as u32;
+            f.prop_id = MY_WEAPONS_OFFSET;
         }
         if full_name
             == "CCSPlayerPawn.CCSPlayer_ActionTrackingServices.WeaponPurchaseCount_t.m_nCount"
         {
-            f.prop_id = ITEM_PURCHASE_COUNT as u32;
+            f.prop_id = ITEM_PURCHASE_COUNT;
         }
         if full_name == "CCSPlayerPawn.CCSPlayer_BuyServices.SellbackPurchaseEntry_t.m_unDefIdx" {
-            f.prop_id = ITEM_PURCHASE_DEF_IDX as u32;
+            f.prop_id = ITEM_PURCHASE_DEF_IDX;
         }
         if full_name == "CCSPlayerPawn.CCSPlayer_BuyServices.SellbackPurchaseEntry_t.m_nCost" {
-            f.prop_id = ITEM_PURCHASE_COST as u32;
+            f.prop_id = ITEM_PURCHASE_COST;
         }
         if full_name == "CCSPlayerPawn.CCSPlayer_ActionTrackingServices.WeaponPurchaseCount_t.m_nItemDefIndex" {
-            f.prop_id = ITEM_PURCHASE_NEW_DEF_IDX as u32;
+            f.prop_id = ITEM_PURCHASE_NEW_DEF_IDX;
         }
         if full_name == "CCSPlayerPawn.CCSPlayer_BuyServices.SellbackPurchaseEntry_t.m_hItem" {
-            f.prop_id = ITEM_PURCHASE_HANDLE as u32;
+            f.prop_id = ITEM_PURCHASE_HANDLE;
         }
         if prop_name.contains("CEconItemAttribute.m_iRawValue32") {
-            f.prop_id = WEAPON_SKIN_ID as u32;
+            f.prop_id = WEAPON_SKIN_ID;
         }
         self.id += 1;
     }
 
-    fn set_id(&mut self, weap_prop: &str, f: &mut ValueField, is_grenade_or_weapon: bool) {
+    fn set_id(&mut self, weap_prop: &str, f: &mut ValueField) {
         match self.name_to_id.get(weap_prop) {
             // If we already have an id for prop of same name then use that id.
             // Mainly for weapon props. For example CAK47.m_iClip1 and CWeaponSCAR20.m_iClip1
             // are the "same" prop. (they have same path and we want to refer to it with one id not ~20)
             Some(id) => {
-                f.prop_id = *id as u32;
+                f.prop_id = *id;
                 self.id_to_name.insert(*id, weap_prop.to_string());
-                self.set_special_ids(&weap_prop, is_grenade_or_weapon, *id);
-                return;
             }
             None => {
                 self.name_to_id.insert(weap_prop.to_string(), self.id);
                 self.id_to_name.insert(self.id, weap_prop.to_string());
-                f.prop_id = self.id as u32;
-                self.set_special_ids(&weap_prop, is_grenade_or_weapon, self.id);
+                f.prop_id = self.id;
             }
         }
     }
@@ -274,23 +267,10 @@ impl PropController {
         self.prop_infos.insert(
             f.prop_id,
             PropInfo {
-                id: f.prop_id as u32,
+                id: f.prop_id,
                 prop_name: prop_name.into(),
             },
         );
-    }
-
-    pub fn set_special_ids(&mut self, weap_prop: &str, is_grenade_or_weapon: bool, id: u32) {
-        // TODO
-        if is_grenade_or_weapon {
-            match weap_prop {
-                _ => {}
-            };
-        } else {
-            match weap_prop {
-                _ => {}
-            };
-        }
     }
 }
 
