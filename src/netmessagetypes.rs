@@ -185,6 +185,7 @@ impl TryFrom<i32> for NetmessageType {
             383 => Ok(CS_UM_ShootInfo),
             //
             400 => Ok(TE_EffectDispatch),
+            410 => Ok(TE_Decal),
             411 => Ok(TE_WorldDecal),
             419 => Ok(TE_Explosion),
             423 => Ok(TE_PhysicsProp),
@@ -380,6 +381,7 @@ pub enum NetmessageType {
     UM_InventoryResponse,
     //
     TE_EffectDispatch,
+    TE_Decal,
     TE_WorldDecal,
     TE_Explosion,
     TE_PhysicsProp,
