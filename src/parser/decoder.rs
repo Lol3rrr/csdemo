@@ -268,8 +268,8 @@ impl<'b> crate::bitreader::Bitreader<'b> {
 
     pub fn decode_vector_noscale(&mut self) -> Result<[f32; 3], super::FirstPassError> {
         let mut v = [0.0; 3];
-        for idx in 0..3 {
-            v[idx] = self.decode_noscale()?;
+        for item in v.iter_mut() {
+            *item = self.decode_noscale()?;
         }
         Ok(v)
     }
@@ -343,8 +343,8 @@ impl<'b> crate::bitreader::Bitreader<'b> {
 
     pub fn decode_vector_float_coord(&mut self) -> Result<[f32; 3], super::FirstPassError> {
         let mut v = [0.0; 3];
-        for idx in 0..3 {
-            v[idx] = self.decode_float_coord()?;
+        for item in v.iter_mut() {
+            *item = self.decode_float_coord()?;
         }
         Ok(v)
     }

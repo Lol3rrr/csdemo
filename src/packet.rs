@@ -2,9 +2,9 @@ use crate::csgo_proto;
 
 #[derive(Debug)]
 pub enum DemoEvent {
-    GameEvent(crate::game_event::GameEvent),
-    ServerInfo(csgo_proto::CsvcMsgServerInfo),
-    Tick(csgo_proto::CnetMsgTick),
-    RankUpdate(csgo_proto::CcsUsrMsgServerRankUpdate),
-    RankReveal(csgo_proto::CcsUsrMsgServerRankRevealAll),
+    GameEvent(Box<crate::game_event::GameEvent>),
+    ServerInfo(Box<csgo_proto::CsvcMsgServerInfo>),
+    Tick(Box<csgo_proto::CnetMsgTick>),
+    RankUpdate(Box<csgo_proto::CcsUsrMsgServerRankUpdate>),
+    RankReveal(Box<csgo_proto::CcsUsrMsgServerRankRevealAll>),
 }

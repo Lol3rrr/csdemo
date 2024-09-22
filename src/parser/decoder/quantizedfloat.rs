@@ -54,12 +54,11 @@ impl QuantalizedFloat {
         self.high_low_mul = 0.0;
         let range = self.high - self.low;
 
-        let high: u32;
-        if self.bit_count == 32 {
-            high = 0xFFFFFFFE;
+        let high: u32 = if self.bit_count == 32 {
+            0xFFFFFFFE
         } else {
-            high = (1 << self.bit_count) - 1;
-        }
+            (1 << self.bit_count) - 1
+        };
 
         let mut high_mul: f32;
         // Xd?

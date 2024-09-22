@@ -114,7 +114,7 @@ impl PropController {
         self.traverse_fields(&mut serializer.fields, serializer.name.clone(), Vec::new())
     }
 
-    fn traverse_fields(&mut self, fields: &mut Vec<Field>, ser_name: String, path_og: Vec<i32>) {
+    fn traverse_fields(&mut self, fields: &mut [Field], ser_name: String, path_og: Vec<i32>) {
         for (idx, f) in fields.iter_mut().enumerate() {
             let mut path = path_og.clone();
             path.push(idx as i32);

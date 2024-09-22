@@ -12,5 +12,5 @@ fn main() {
     println!("Header: {:?}", output.header);
     println!("Players: {:?}", output.player_info);
     println!("Events: {:?}", output.events.len());
-    println!("Entities: {:?}", output.entity_states.len());
+    println!("Entity-Ticks: {:?}", output.entity_states.ticks.len());
 }

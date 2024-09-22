@@ -52,12 +52,45 @@ pub struct Entity {
 }
 
 #[derive(Debug)]
+pub struct EntityTickList {
+    pub ticks: Vec<EntityTickStates>,
+}
+
+impl EntityTickList {
+    pub fn new() -> Self {
+        Self {
+            ticks: vec![EntityTickStates {
+                tick: 0,
+                states: Vec::new()
+            }],
+        }
+    }
+
+    fn new_tick(&mut self, n_tick: u32) {
+        self.ticks.push(EntityTickStates {
+            tick: n_tick,
+            states: Vec::new(),
+        });
+    }
+
+    fn add_state(&mut self, state: entities::EntityState) {
+        self.ticks.last_mut().expect("We start with at least 1 tick entry and never remove any, so we can always get the last element").states.push(state);
+    }
+}
+
+#[derive(Debug)]
+pub struct EntityTickStates {
+    pub tick: u32,
+    pub states: Vec<entities::EntityState>,
+}
+
+#[derive(Debug)]
 pub struct FirstPassOutput {
     pub header: crate::csgo_proto::CDemoFileHeader,
     pub info: crate::csgo_proto::CDemoFileInfo,
     pub events: Vec<DemoEvent>,
     pub player_info: std::collections::HashMap<UserId, Player>,
-    pub entity_states: Vec<entities::EntityState>,
+    pub entity_states: EntityTickList,
 }
 
 #[derive(Debug)]
@@ -104,7 +137,9 @@ where
 
     let mut baselines = std::collections::HashMap::new();
 
-    let mut entity_states = Vec::new();
+    let mut entity_states = EntityTickList::new();
+
+    let mut current_tick = 0;
 
     let mut buffer = Vec::new();
     for frame in frames.into_iter() {
@@ -135,6 +170,7 @@ where
                     &mut baselines,
                     &prop_controller,
                     &mut entity_states,
+                    &mut current_tick,
                 )?;
             }
             DemoCommand::FullPacket => {
@@ -152,6 +188,7 @@ where
                         &mut baselines,
                         &prop_controller,
                         &mut entity_states,
+                        &mut current_tick,
                     )?;
                 }
             }
@@ -250,7 +287,8 @@ fn inner_parse_packet(
     qf_mapper: &mut decoder::QfMapper,
     baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
     prop_controller: &propcontroller::PropController,
-    entity_states: &mut Vec<entities::EntityState>,
+    entity_states: &mut EntityTickList,
+    current_tick: &mut u32,
 ) -> Result<(), FirstPassError> {
     let mut bitreader = crate::bitreader::Bitreader::new(raw.data());
 
@@ -288,7 +326,7 @@ fn inner_parse_packet(
                 let raw: crate::csgo_proto::CsvcMsgServerInfo =
                     prost::Message::decode(msg_bytes.as_slice())?;
 
-                events.push(DemoEvent::ServerInfo(raw));
+                events.push(DemoEvent::ServerInfo(Box::new(raw)));
             }
             crate::netmessagetypes::NetmessageType::net_SignonState => {
                 let raw: crate::csgo_proto::CnetMsgSignonState =
@@ -299,7 +337,13 @@ fn inner_parse_packet(
                 let raw: crate::csgo_proto::CnetMsgTick =
                     prost::Message::decode(msg_bytes.as_slice())?;
 
-                events.push(DemoEvent::Tick(raw));
+                assert!(*current_tick <= raw.tick(), "Current Tick {} <= Tick Packet {}", *current_tick, raw.tick());
+                if raw.tick() > *current_tick {
+                    *current_tick = raw.tick();
+                    entity_states.new_tick(*current_tick);
+                }
+
+                events.push(DemoEvent::Tick(Box::new(raw)));
             }
             crate::netmessagetypes::NetmessageType::net_SetConVar => {}
             crate::netmessagetypes::NetmessageType::svc_ClassInfo => {}
@@ -345,7 +389,7 @@ fn inner_parse_packet(
                                     prop_controller,
                                 )?;
                                 if let Some(state) = state {
-                                    entity_states.push(state);
+                                    entity_states.add_state(state);
                                 }
                             }
                             0b00 => {
@@ -362,7 +406,7 @@ fn inner_parse_packet(
                                     prop_controller,
                                 )?;
                                 if let Some(state) = state {
-                                    entity_states.push(state);
+                                    entity_states.add_state(state);
                                 }
                             }
                             unknown => {
@@ -388,7 +432,7 @@ fn inner_parse_packet(
                             Some(parser) => {
                                 let parsed = parser.parse(keys.as_slice(), raw.clone())?;
 
-                                events.push(DemoEvent::GameEvent(parsed));
+                                events.push(DemoEvent::GameEvent(Box::new(parsed)));
                             }
                             None => {
                                 println!("No parser for {:?}", name);
@@ -406,13 +450,13 @@ fn inner_parse_packet(
                 let raw: crate::csgo_proto::CcsUsrMsgServerRankUpdate =
                     prost::Message::decode(msg_bytes.as_slice())?;
 
-                events.push(DemoEvent::RankUpdate(raw));
+                events.push(DemoEvent::RankUpdate(Box::new(raw)));
             }
             crate::netmessagetypes::NetmessageType::CS_UM_ServerRankRevealAll => {
                 let raw: crate::csgo_proto::CcsUsrMsgServerRankRevealAll =
                     prost::Message::decode(msg_bytes.as_slice())?;
 
-                events.push(DemoEvent::RankReveal(raw));
+                events.push(DemoEvent::RankReveal(Box::new(raw)));
             }
             crate::netmessagetypes::NetmessageType::CS_UM_WeaponSound => {}
             crate::netmessagetypes::NetmessageType::CS_UM_RadioText => {}
@@ -440,8 +484,8 @@ fn inner_parse_packet(
             crate::netmessagetypes::NetmessageType::net_SpawnGroup_Load => {}
             crate::netmessagetypes::NetmessageType::CS_UM_MatchEndConditions => {}
             crate::netmessagetypes::NetmessageType::TE_Explosion => {}
-            unknown => {
-                dbg!(unknown);
+            _unknown => {
+                // dbg!(unknown);
             }
         };
     }

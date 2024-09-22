@@ -18,7 +18,7 @@ fn mirage_1() {
     assert_eq!("de_mirage", output.header.map_name());
 
     for event in output.events.iter() {
-        if let DemoEvent::GameEvent(gevent) = event { if let GameEvent::PlayerDeath(death) = gevent {
+        if let DemoEvent::GameEvent(gevent) = event { if let GameEvent::PlayerDeath(death) = gevent.as_ref() {
             assert!(
                 death.remaining.is_empty(),
                 "Remaining for PlayerDeath: {:?}",
