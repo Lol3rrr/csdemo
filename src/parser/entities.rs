@@ -75,7 +75,7 @@ impl EntityContext {
             None => panic!(),
         };
 
-        let mut fields = Vec::new();
+        let mut fields = Vec::with_capacity(n_updates);
         for path in paths.paths().take(n_updates) {
             let field = path.find(&class.serializer)?;
             let field_info = field.get_propinfo(path);
@@ -84,9 +84,7 @@ impl EntityContext {
 
             if let Some(fi) = field_info {
                 if let Some(prop_info) = prop_controller
-                    .prop_infos
-                    .iter()
-                    .find(|pi| fi.prop_id == pi.id)
+                    .prop_infos.get(&fi.prop_id)
                 {
                     fields.push(EntityProp {
                         field_info: fi,

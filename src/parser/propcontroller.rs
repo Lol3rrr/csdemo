@@ -72,7 +72,7 @@ pub const INPUT_HISTORY_PLAYER_TICK_COUNT_OFFSET: u32 = 5;
 pub const INPUT_HISTORY_PLAYER_TICK_FRACTION_OFFSET: u32 = 6;
 
 use super::sendtables::{Field, ValueField};
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Debug, Clone)]
 pub struct PropController {
@@ -81,7 +81,7 @@ pub struct PropController {
     pub name_to_id: HashMap<String, u32>,
     pub id_to_name: HashMap<u32, String>,
     pub path_to_name: HashMap<[i32; 7], String>,
-    pub prop_infos: Vec<PropInfo>,
+    pub prop_infos: HashMap<u32, PropInfo>,
 }
 
 #[derive(Debug, Clone)]
@@ -91,7 +91,7 @@ pub struct SpecialIDs {}
 pub struct PropInfo {
     pub id: u32,
     // pub prop_type: PropType,
-    pub prop_name: String,
+    pub prop_name: Arc<str>,
     // pub prop_friendly_name: String,
     // pub is_player_prop: bool
 }
@@ -104,7 +104,7 @@ impl PropController {
             name_to_id: HashMap::new(),
             id_to_name: HashMap::new(),
             path_to_name: HashMap::new(),
-            prop_infos: Vec::new(),
+            prop_infos: HashMap::new(),
         }
     }
 
@@ -271,9 +271,9 @@ impl PropController {
     }
 
     fn insert_propinfo(&mut self, prop_name: &str, f: &mut ValueField) {
-        self.prop_infos.push(PropInfo {
+        self.prop_infos.insert(f.prop_id, PropInfo {
             id: f.prop_id as u32,
-            prop_name: prop_name.to_string(),
+            prop_name: prop_name.into(),
         });
     }
 
