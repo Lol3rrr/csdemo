@@ -83,9 +83,7 @@ impl EntityContext {
             let result = decoder.decode(bitreader, qf_mapper)?;
 
             if let Some(fi) = field_info {
-                if let Some(prop_info) = prop_controller
-                    .prop_infos.get(&fi.prop_id)
-                {
+                if let Some(prop_info) = prop_controller.prop_infos.get(&fi.prop_id) {
                     fields.push(EntityProp {
                         field_info: fi,
                         prop_info: prop_info.clone(),

@@ -109,7 +109,9 @@ where
 
     let mut buffer = Vec::new();
     for frame in frames.into_iter() {
-        let data = frame.decompress_with_buf(&mut buffer).map_err(|e| FirstPassError::DecompressFrame)?;
+        let data = frame
+            .decompress_with_buf(&mut buffer)
+            .map_err(|e| FirstPassError::DecompressFrame)?;
 
         match frame.cmd {
             DemoCommand::FileHeader => {
@@ -121,8 +123,10 @@ where
                 file_info = Some(raw);
             }
             DemoCommand::SignonPacket | DemoCommand::Packet => {
-                parse_packet(
-                    data,
+                let raw: crate::csgo_proto::CDemoPacket = prost::Message::decode(data)?;
+
+                inner_parse_packet(
+                    &raw,
                     &mut events,
                     &mut event_mapping,
                     &mut player_info,
@@ -135,18 +139,22 @@ where
                 )?;
             }
             DemoCommand::FullPacket => {
-                parse_fullpacket(
-                    data,
-                    &mut events,
-                    &mut event_mapping,
-                    &mut player_info,
-                    &mut entity_ctx,
-                    &mut paths,
-                    &mut qf_mapper,
-                    &mut baselines,
-                    &prop_controller,
-                    &mut entity_states,
-                )?;
+                let packet = parse_fullpacket(data)?;
+
+                if let Some(packet) = packet {
+                    inner_parse_packet(
+                        &packet,
+                        &mut events,
+                        &mut event_mapping,
+                        &mut player_info,
+                        &mut entity_ctx,
+                        &mut paths,
+                        &mut qf_mapper,
+                        &mut baselines,
+                        &prop_controller,
+                        &mut entity_states,
+                    )?;
+                }
             }
             // TODO
             DemoCommand::AnimationData => {}
@@ -222,18 +230,7 @@ where
     })
 }
 
-fn parse_fullpacket(
-    data: &[u8],
-    events: &mut Vec<DemoEvent>,
-    event_mapper: &mut GameEventMapping,
-    player_info: &mut std::collections::HashMap<UserId, Player>,
-    entity_ctx: &mut entities::EntityContext,
-    paths: &mut Paths,
-    qf_mapper: &mut decoder::QfMapper,
-    baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
-    prop_controller: &propcontroller::PropController,
-    entity_states: &mut Vec<entities::EntityState>,
-) -> Result<(), FirstPassError> {
+fn parse_fullpacket(data: &[u8]) -> Result<Option<crate::csgo_proto::CDemoPacket>, FirstPassError> {
     let raw: crate::csgo_proto::CDemoFullPacket = prost::Message::decode(data)?;
 
     // TODO
@@ -242,55 +239,7 @@ fn parse_fullpacket(
         // dbg!(&item.table_name);
     }
 
-    match raw.packet {
-        Some(packet) => {
-            inner_parse_packet(
-                &packet,
-                events,
-                event_mapper,
-                player_info,
-                entity_ctx,
-                paths,
-                qf_mapper,
-                baselines,
-                prop_controller,
-                entity_states,
-            )?;
-
-            Ok(())
-        }
-        None => Ok(()),
-    }
-}
-
-fn parse_packet(
-    data: &[u8],
-    events: &mut Vec<DemoEvent>,
-    event_mapper: &mut GameEventMapping,
-    player_info: &mut std::collections::HashMap<UserId, Player>,
-    entity_ctx: &mut entities::EntityContext,
-    paths: &mut Paths,
-    qf_mapper: &mut decoder::QfMapper,
-    baselines: &mut std::collections::HashMap<u32, Vec<u8>>,
-    prop_controller: &propcontroller::PropController,
-    entity_states: &mut Vec<entities::EntityState>,
-) -> Result<(), FirstPassError> {
-    let raw: crate::csgo_proto::CDemoPacket = prost::Message::decode(data)?;
-
-    inner_parse_packet(
-        &raw,
-        events,
-        event_mapper,
-        player_info,
-        entity_ctx,
-        paths,
-        qf_mapper,
-        baselines,
-        prop_controller,
-        entity_states,
-    )?;
-
-    Ok(())
+    Ok(raw.packet)
 }
 
 fn inner_parse_packet(

@@ -271,10 +271,13 @@ impl PropController {
     }
 
     fn insert_propinfo(&mut self, prop_name: &str, f: &mut ValueField) {
-        self.prop_infos.insert(f.prop_id, PropInfo {
-            id: f.prop_id as u32,
-            prop_name: prop_name.into(),
-        });
+        self.prop_infos.insert(
+            f.prop_id,
+            PropInfo {
+                id: f.prop_id as u32,
+                prop_name: prop_name.into(),
+            },
+        );
     }
 
     pub fn set_special_ids(&mut self, weap_prop: &str, is_grenade_or_weapon: bool, id: u32) {
