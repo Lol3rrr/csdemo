@@ -247,8 +247,8 @@ where
                     }
                 }
             }
-            other => {
-                dbg!(other);
+            _other => {
+                // dbg!(other);
             }
         }
     }
@@ -329,9 +329,9 @@ fn inner_parse_packet(
                 events.push(DemoEvent::ServerInfo(Box::new(raw)));
             }
             crate::netmessagetypes::NetmessageType::net_SignonState => {
-                let raw: crate::csgo_proto::CnetMsgSignonState =
+                let _raw: crate::csgo_proto::CnetMsgSignonState =
                     prost::Message::decode(msg_bytes.as_slice())?;
-                dbg!(raw);
+                // dbg!(raw);
             }
             crate::netmessagetypes::NetmessageType::net_Tick => {
                 let raw: crate::csgo_proto::CnetMsgTick =
