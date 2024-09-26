@@ -4,7 +4,7 @@ mod fieldpath;
 pub use fieldpath::{FieldPath, Paths};
 
 mod decoder;
-mod entities;
+pub mod entities;
 mod propcontroller;
 mod sendtables;
 mod variant;
