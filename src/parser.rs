@@ -9,6 +9,7 @@ mod propcontroller;
 mod sendtables;
 mod variant;
 
+pub use variant::Variant;
 pub use entities::EntityFilter;
 
 #[derive(Debug)]
