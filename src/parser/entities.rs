@@ -8,6 +8,7 @@ pub struct EntityContext {
 
 #[derive(Debug, Clone)]
 pub struct EntityState {
+    pub id: i32,
     pub class: String,
     pub cls: u32,
     pub props: Vec<EntityProp>,
@@ -100,6 +101,7 @@ impl EntityContext {
         Ok(Some((
             n_updates,
             EntityState {
+                id: entity_id,
                 class: class.name.clone(),
                 cls: entity.cls,
                 props: fields,
