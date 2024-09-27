@@ -109,3 +109,9 @@ impl EntityContext {
         )))
     }
 }
+
+impl EntityState {
+    pub fn get_prop(&self, name: &str) -> Option<&EntityProp> {
+        self.props.iter().find(|p| p.prop_info.prop_name.as_ref() == name)
+    }
+}
