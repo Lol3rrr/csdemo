@@ -90,6 +90,8 @@ impl EntityContext {
                         prop_info: prop_info.clone(),
                         value: result,
                     });
+                } else {
+                    println!("Missing PropInfo for {:?}", fi);
                 }
             }
         }
