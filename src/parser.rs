@@ -1,4 +1,4 @@
-use crate::{packet::DemoEvent, DemoCommand, Frame, UserId, FrameDecompressError};
+use crate::{packet::DemoEvent, DemoCommand, Frame, FrameDecompressError, UserId};
 
 mod fieldpath;
 pub use fieldpath::{FieldPath, Paths};
@@ -9,8 +9,8 @@ mod propcontroller;
 mod sendtables;
 mod variant;
 
-pub use variant::Variant;
 pub use entities::EntityFilter;
+pub use variant::Variant;
 
 #[derive(Debug)]
 pub enum FirstPassError {
@@ -62,7 +62,7 @@ impl EntityTickList {
         Self {
             ticks: vec![EntityTickStates {
                 tick: 0,
-                states: Vec::new()
+                states: Vec::new(),
             }],
         }
     }
@@ -338,7 +338,12 @@ fn inner_parse_packet(
                 let raw: crate::csgo_proto::CnetMsgTick =
                     prost::Message::decode(msg_bytes.as_slice())?;
 
-                assert!(*current_tick <= raw.tick(), "Current Tick {} <= Tick Packet {}", *current_tick, raw.tick());
+                assert!(
+                    *current_tick <= raw.tick(),
+                    "Current Tick {} <= Tick Packet {}",
+                    *current_tick,
+                    raw.tick()
+                );
                 if raw.tick() > *current_tick {
                     *current_tick = raw.tick();
                     entity_states.new_tick(*current_tick);
@@ -368,7 +373,7 @@ fn inner_parse_packet(
 
                                 if let Some(baseline_bytes) = baselines.get(&cls) {
                                     let mut br = crate::bitreader::Bitreader::new(baseline_bytes);
-                                    
+
                                     // TODO
                                     // How should we handle is this?
                                     let _state = update_entity(
@@ -394,7 +399,9 @@ fn inner_parse_packet(
                                 }
                             }
                             0b00 => {
-                                if raw.has_pvs_vis_bits() > 0 && bitreader.read_nbits(2)? & 0x01 == 1 {
+                                if raw.has_pvs_vis_bits() > 0
+                                    && bitreader.read_nbits(2)? & 0x01 == 1
+                                {
                                     continue;
                                 }
 

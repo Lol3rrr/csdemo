@@ -91,8 +91,10 @@ impl EntityContext {
                         value: result,
                     });
                 } else {
-                    println!("Missing PropInfo for {:?}", fi);
+                    // println!("Missing PropInfo for {:?} = {:?}", fi, result);
                 }
+            } else {
+                // println!("Missing Field Info for {:?} with {:?} = {:?}", field, path, result);
             }
         }
 
@@ -114,6 +116,8 @@ impl EntityContext {
 
 impl EntityState {
     pub fn get_prop(&self, name: &str) -> Option<&EntityProp> {
-        self.props.iter().find(|p| p.prop_info.prop_name.as_ref() == name)
+        self.props
+            .iter()
+            .find(|p| p.prop_info.prop_name.as_ref() == name)
     }
 }

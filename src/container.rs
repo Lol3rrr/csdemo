@@ -28,8 +28,7 @@ impl<'b> Container<'b> {
             return Err(ParseContainerError::MissingHeader);
         }
 
-        let magic =
-            core::str::from_utf8(&input[..8]).map_err(ParseContainerError::InvalidMagic)?;
+        let magic = core::str::from_utf8(&input[..8]).map_err(ParseContainerError::InvalidMagic)?;
         let raw_len: [u8; 4] = input[8..12]
             .try_into()
             .expect("We know that the input buffer is at least 16 bytes large");

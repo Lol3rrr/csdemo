@@ -106,7 +106,42 @@ impl PropController {
             name_to_id: HashMap::new(),
             id_to_name: HashMap::new(),
             path_to_name: HashMap::new(),
-            prop_infos: HashMap::new(),
+            prop_infos: [
+                (
+                    WEAPON_SKIN_ID,
+                    PropInfo {
+                        id: WEAPON_SKIN_ID,
+                        prop_name: "weapon_skin_id".into(),
+                    },
+                ),
+                (
+                    WEAPON_PAINT_SEED,
+                    PropInfo {
+                        id: WEAPON_PAINT_SEED,
+                        prop_name: "weapon_paint_seed".into(),
+                    },
+                ),
+                (
+                    WEAPON_FLOAT,
+                    PropInfo {
+                        id: WEAPON_FLOAT,
+                        prop_name: "weapon_float".into(),
+                    },
+                ),
+                (
+                    MY_WEAPONS_OFFSET,
+                    PropInfo {
+                        id: MY_WEAPONS_OFFSET,
+                        prop_name: "my_weapons_offset".into(),
+                    },
+                ),
+                (ITEM_PURCHASE_COST, PropInfo {
+                    id: ITEM_PURCHASE_COST,
+                    prop_name: "item_purchase_cost".into(),
+                }),
+            ]
+            .into_iter()
+            .collect(),
         }
     }
 
@@ -138,9 +173,11 @@ impl PropController {
                         path.clone(),
                     );
                 }
-                Field::Array(ser) => if let Field::Value(v) = &mut ser.field_enum.as_mut() {
-                    self.handle_prop(&(ser_name.clone() + "." + &v.name), v, path);
-                },
+                Field::Array(ser) => {
+                    if let Field::Value(v) = &mut ser.field_enum.as_mut() {
+                        self.handle_prop(&(ser_name.clone() + "." + &v.name), v, path);
+                    }
+                }
                 Field::Vector(_x) => {
                     let vec_path = path.clone();
                     if let Ok(inner) = f.get_inner_mut(0) {

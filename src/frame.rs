@@ -23,15 +23,19 @@ impl<'b> Frame<'b> {
     where
         'ib: 'b,
     {
-        let (input, raw_cmd) = crate::varint::parse_varint(input).map_err(FrameParseError::ParseVarint)?;
-        let (input, tick) = crate::varint::parse_varint(input).map_err(FrameParseError::ParseVarint)?;
-        let (input, size) = crate::varint::parse_varint(input).map_err(FrameParseError::ParseVarint)?;
+        let (input, raw_cmd) =
+            crate::varint::parse_varint(input).map_err(FrameParseError::ParseVarint)?;
+        let (input, tick) =
+            crate::varint::parse_varint(input).map_err(FrameParseError::ParseVarint)?;
+        let (input, size) =
+            crate::varint::parse_varint(input).map_err(FrameParseError::ParseVarint)?;
 
         if input.len() < size as usize {
             return Err(FrameParseError::NotEnoughBytes);
         }
 
-        let demo_cmd = crate::DemoCommand::try_from((raw_cmd & !64) as i32).map_err(FrameParseError::ParseDemoCommand)?;
+        let demo_cmd = crate::DemoCommand::try_from((raw_cmd & !64) as i32)
+            .map_err(FrameParseError::ParseDemoCommand)?;
 
         Ok((
             &input[size as usize..],
@@ -52,7 +56,10 @@ impl<'b> Frame<'b> {
         Some(self.inner.as_ref())
     }
 
-    pub fn decompress_with_buf<'s, 'buf>(&'s self, buf: &'b mut Vec<u8>) -> Result<&'buf [u8], FrameDecompressError>
+    pub fn decompress_with_buf<'s, 'buf>(
+        &'s self,
+        buf: &'b mut Vec<u8>,
+    ) -> Result<&'buf [u8], FrameDecompressError>
     where
         's: 'buf,
     {
@@ -60,16 +67,13 @@ impl<'b> Frame<'b> {
             return Ok(&self.inner);
         }
 
-        let uncompressed_len = snap::raw::decompress_len(&self.inner).map_err(|e| {
-            FrameDecompressError::GettingDecompressedLength(e)
-        })?;
+        let uncompressed_len = snap::raw::decompress_len(&self.inner)
+            .map_err(|e| FrameDecompressError::GettingDecompressedLength(e))?;
         buf.resize(uncompressed_len, 0);
 
         snap::raw::Decoder::new()
             .decompress(&self.inner, buf.as_mut_slice())
-            .map_err(|e| {
-                FrameDecompressError::Decompressing(e)
-            })?;
+            .map_err(|e| FrameDecompressError::Decompressing(e))?;
 
         Ok(buf.as_slice())
     }
