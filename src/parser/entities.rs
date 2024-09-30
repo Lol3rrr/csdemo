@@ -1,5 +1,7 @@
 use super::{decoder, propcontroller, Class, Entity, FirstPassError, Paths};
 
+use std::sync::Arc;
+
 pub struct EntityContext {
     pub entities: std::collections::HashMap<i32, Entity>,
     pub cls_to_class: std::collections::HashMap<u32, Class>,
@@ -9,7 +11,7 @@ pub struct EntityContext {
 #[derive(Debug, Clone)]
 pub struct EntityState {
     pub id: i32,
-    pub class: String,
+    pub class: Arc<str>,
     pub cls: u32,
     pub props: Vec<EntityProp>,
 }
@@ -98,7 +100,7 @@ impl EntityContext {
             }
         }
 
-        if !(self.filter.entity)(class.name.as_str()) {
+        if !(self.filter.entity)(class.name.as_ref()) {
             return Ok(None);
         }
 

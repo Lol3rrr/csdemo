@@ -107,7 +107,7 @@ struct GameEventMapping {
 
 #[derive(Debug)]
 pub struct Class {
-    name: String,
+    name: std::sync::Arc<str>,
     serializer: sendtables::Serializer,
 }
 
@@ -241,7 +241,7 @@ where
                         entity_ctx.cls_to_class.insert(
                             cls_id as u32,
                             Class {
-                                name: network_name.to_owned(),
+                                name: network_name.into(),
                                 serializer: ser,
                             },
                         );
