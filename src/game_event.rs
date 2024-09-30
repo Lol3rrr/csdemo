@@ -12,15 +12,25 @@ macro_rules! define_event {
         impl $name {
             #[allow(unused_mut)]
             fn parse(keys: &[crate::csgo_proto::csvc_msg_game_event_list::KeyT], event: crate::csgo_proto::CMsgSource1LegacyGameEvent) -> Result<GameEvent, ParseGameEventError> {
-                let mut fields: ::std::collections::HashMap<_,_> = keys.iter().zip(event.keys.into_iter()).map(|(k, f)| {
-                    (k.name().to_owned(), f)
-                }).collect();
+                
+                $(let mut $field: Option<RawValue> = None;)*
+                let mut remaining = std::collections::HashMap::new();        
 
-                $(let $field: Option<RawValue> = fields.remove(stringify!($field)).map(|f| f.try_into().ok()).flatten();)*
+                for (k, f) in keys.iter().zip(event.keys.into_iter()) {
+                    let name = k.name();
+                    $(
+                    if name == stringify!($field) {
+                        $field = Some(f.try_into().ok()).flatten();
+                        continue;
+                    }
+                    )*
+
+                    remaining.insert(name.to_owned(), f);
+                }
 
                 let value = $name {
                     $($field: $field.map(|f| f.try_into().ok()).flatten(),)*
-                    remaining: fields,
+                    remaining,
                 };
 
                 Ok($target(value))

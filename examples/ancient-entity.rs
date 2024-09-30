@@ -14,6 +14,7 @@ fn main() {
     println!("Events: {:?}", output.events.len());
     println!("Entity-Ticks: {:?}", output.entity_states.ticks.len());
 
+    /*
     for tick in output.entity_states.ticks.iter() {
         for state in tick.states.iter() {
             if state.class.as_str() != "CCSPlayerPawn" {
@@ -25,4 +26,5 @@ fn main() {
             }
         }
     }
+    */
 }
