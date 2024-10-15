@@ -52,6 +52,14 @@ pub mod ccsteam {
                 .map(|v| super::pawnid::PawnID::from(v))
                 .collect()
         }
+
+        pub fn score(&self) -> Option<i32> {
+            self.0.get_prop("CCSTeam.m_iScore").map(|p| p.value.as_i32()).flatten()
+        }
+
+        pub fn team_number(&self) -> Option<u32> {
+            self.0.get_prop("CCSTeam.m_iTeamNum").map(|p| p.value.as_u32()).flatten()
+        }
     }
 }
 
