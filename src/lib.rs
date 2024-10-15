@@ -24,3 +24,5 @@ pub mod parser;
 pub mod csgo_proto {
     include!(concat!(env!("OUT_DIR"), "/_.rs"));
 }
+
+pub mod structured;
