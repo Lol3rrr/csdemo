@@ -8,7 +8,7 @@ pub struct EntityContext {
     pub filter: EntityFilter,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EntityState {
     pub id: i32,
     pub class: Arc<str>,
@@ -16,7 +16,7 @@ pub struct EntityState {
     pub props: Vec<EntityProp>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EntityProp {
     pub field_info: super::sendtables::FieldInfo,
     pub prop_info: super::propcontroller::PropInfo,

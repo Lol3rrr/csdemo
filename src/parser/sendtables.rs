@@ -6,7 +6,7 @@ pub struct Serializer {
     pub fields: Vec<Field>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FieldInfo {
     pub decoder: decoder::Decoder,
     pub should_parse: bool,

@@ -89,7 +89,7 @@ pub struct PropController {
 #[derive(Debug, Clone)]
 pub struct SpecialIDs {}
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PropInfo {
     pub id: u32,
     // pub prop_type: PropType,
