@@ -1,7 +1,6 @@
 use crate::{
     parser::{
-        decoder, entities, propcontroller, sendtables, update_entity, Class,
-        FirstPassError, Paths,
+        decoder, entities, propcontroller, sendtables, update_entity, Class, FirstPassError, Paths,
     },
     DemoCommand, FrameIterator,
 };
