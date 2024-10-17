@@ -23,11 +23,11 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        crate: [analysis, backend]
     steps:
     - uses: actions/checkout@v4
+      with:
+        lfs: 'true'
+        submodules: 'recursive'
     - name: Install latest nightly
       uses: actions-rs/toolchain@v1
       with:
