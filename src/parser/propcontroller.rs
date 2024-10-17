@@ -135,10 +135,13 @@ impl PropController {
                         prop_name: "my_weapons_offset".into(),
                     },
                 ),
-                (ITEM_PURCHASE_COST, PropInfo {
-                    id: ITEM_PURCHASE_COST,
-                    prop_name: "item_purchase_cost".into(),
-                }),
+                (
+                    ITEM_PURCHASE_COST,
+                    PropInfo {
+                        id: ITEM_PURCHASE_COST,
+                        prop_name: "item_purchase_cost".into(),
+                    },
+                ),
             ]
             .into_iter()
             .collect(),

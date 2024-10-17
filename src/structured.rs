@@ -37,16 +37,19 @@ pub mod ccsteam {
         }
 
         pub fn team_name(&self) -> Option<&str> {
-            self.0.get_prop("CCSTeam.m_szTeamname").map(|p| {
-                match &p.value {
+            self.0
+                .get_prop("CCSTeam.m_szTeamname")
+                .map(|p| match &p.value {
                     crate::parser::Variant::String(v) => Some(v.as_str()),
                     _ => None,
-                }
-            }).flatten()
+                })
+                .flatten()
         }
 
         pub fn player_pawns(&self) -> Vec<super::pawnid::PawnID> {
-            self.0.props.iter()
+            self.0
+                .props
+                .iter()
                 .filter(|p| p.prop_info.prop_name.as_ref() == "CCSTeam.m_aPawns")
                 .filter_map(|p| p.value.as_u32())
                 .map(|v| super::pawnid::PawnID::from(v))
@@ -54,11 +57,17 @@ pub mod ccsteam {
         }
 
         pub fn score(&self) -> Option<i32> {
-            self.0.get_prop("CCSTeam.m_iScore").map(|p| p.value.as_i32()).flatten()
+            self.0
+                .get_prop("CCSTeam.m_iScore")
+                .map(|p| p.value.as_i32())
+                .flatten()
         }
 
         pub fn team_number(&self) -> Option<u32> {
-            self.0.get_prop("CCSTeam.m_iTeamNum").map(|p| p.value.as_u32()).flatten()
+            self.0
+                .get_prop("CCSTeam.m_iTeamNum")
+                .map(|p| p.value.as_u32())
+                .flatten()
         }
     }
 }

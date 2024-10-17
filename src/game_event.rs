@@ -12,9 +12,9 @@ macro_rules! define_event {
         impl $name {
             #[allow(unused_mut)]
             fn parse(keys: &[crate::csgo_proto::csvc_msg_game_event_list::KeyT], event: crate::csgo_proto::CMsgSource1LegacyGameEvent) -> Result<GameEvent, ParseGameEventError> {
-                
+
                 $(let mut $field: Option<RawValue> = None;)*
-                let mut remaining = std::collections::HashMap::new();        
+                let mut remaining = std::collections::HashMap::new();
 
                 for (k, f) in keys.iter().zip(event.keys.into_iter()) {
                     let name = k.name();

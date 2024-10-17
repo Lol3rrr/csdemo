@@ -18,6 +18,11 @@ regex = "1.10.6"
 
 [dev-dependencies]
 pretty_assertions = { version  = "1.4" }
+divan = "0.1.14"
+
+[[bench]]
+name = "example"
+harness = false
 
 [build-dependencies]
 prost-build = { version = "0.13.2" }
