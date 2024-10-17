@@ -7,28 +7,39 @@ fn main() {
 
 mod eager {
     #[divan::bench(max_time = std::time::Duration::from_secs(30))]
-    fn no_entities_mirage() -> csdemo::parser::FirstPassOutput {
+    fn no_entities_mirage() {
         let raw_bytes = include_bytes!("../testfiles/mirage.dem");
 
         let container = csdemo::Container::parse(divan::black_box(raw_bytes.as_slice())).unwrap();
 
-        csdemo::parser::parse(
+        let demo = csdemo::parser::parse(
             csdemo::FrameIterator::parse(container.inner),
             csdemo::parser::EntityFilter::disabled(),
         )
-        .unwrap()
+        .unwrap();
+
+        for event in demo.events {
+            divan::black_box(event);
+        }
     }
 
     #[divan::bench(max_time = std::time::Duration::from_secs(30))]
-    fn entities_mirage() -> csdemo::parser::FirstPassOutput {
+    fn entities_mirage() {
         let raw_bytes = include_bytes!("../testfiles/mirage.dem");
 
         let container = csdemo::Container::parse(divan::black_box(raw_bytes.as_slice())).unwrap();
 
-        csdemo::parser::parse(
+        let demo = csdemo::parser::parse(
             csdemo::FrameIterator::parse(container.inner),
             csdemo::parser::EntityFilter::all(),
         )
-        .unwrap()
+        .unwrap();
+
+        for event in demo.events {
+            divan::black_box(event);
+        }
+        for entity in demo.entity_states.ticks {
+            divan::black_box(entity);
+        }
     }
 }
