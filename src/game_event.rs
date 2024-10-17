@@ -2,7 +2,7 @@ use crate::{csgo_proto, RawValue, UserId};
 
 macro_rules! define_event {
     ($name:ident, $target:path $(, ($field:ident, $field_ty:ty))*) => {
-        #[derive(Debug)]
+        #[derive(Debug, PartialEq)]
         #[allow(dead_code)]
         pub struct $name {
             $(pub $field: Option<$field_ty>,)*
@@ -231,7 +231,7 @@ type ParseFn = fn(
     event: csgo_proto::CMsgSource1LegacyGameEvent,
 ) -> Result<GameEvent, ParseGameEventError>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 #[allow(dead_code)]
 pub enum GameEvent {
     HltvVersionInfo(HltvVersionInfo),

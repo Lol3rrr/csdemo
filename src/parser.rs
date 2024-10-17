@@ -3,11 +3,11 @@ use crate::{packet::DemoEvent, DemoCommand, Frame, FrameDecompressError, UserId}
 mod fieldpath;
 pub use fieldpath::{FieldPath, Paths};
 
-mod decoder;
+pub(crate) mod decoder;
 pub mod entities;
-mod propcontroller;
-mod sendtables;
-mod variant;
+pub(crate) mod propcontroller;
+pub(crate) mod sendtables;
+pub(crate) mod variant;
 
 pub use entities::EntityFilter;
 pub use variant::Variant;
@@ -95,8 +95,8 @@ pub struct FirstPassOutput {
 }
 
 #[derive(Debug)]
-struct GameEventMapping {
-    mapping: std::collections::HashMap<
+pub(crate) struct GameEventMapping {
+    pub mapping: std::collections::HashMap<
         i32,
         (
             String,
@@ -107,8 +107,8 @@ struct GameEventMapping {
 
 #[derive(Debug)]
 pub struct Class {
-    name: std::sync::Arc<str>,
-    serializer: sendtables::Serializer,
+    pub(crate) name: std::sync::Arc<str>,
+    pub(crate) serializer: sendtables::Serializer,
 }
 
 pub fn parse<'b, FI>(frames: FI, filter: EntityFilter) -> Result<FirstPassOutput, FirstPassError>
@@ -248,7 +248,7 @@ where
                     }
                 }
             }
-            _other => {
+            _ => {
                 // dbg!(other);
             }
         }
@@ -501,7 +501,7 @@ fn inner_parse_packet(
     Ok(())
 }
 
-fn update_entity(
+pub(crate) fn update_entity(
     entity_id: i32,
     bitreader: &mut crate::bitreader::Bitreader,
     entity_ctx: &mut entities::EntityContext,

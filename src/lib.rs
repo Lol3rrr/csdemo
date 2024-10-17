@@ -19,6 +19,7 @@ pub mod game_event;
 mod values;
 pub use values::*;
 
+pub mod lazyparser;
 pub mod parser;
 
 pub mod csgo_proto {

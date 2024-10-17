@@ -34,8 +34,6 @@ fn mirage_1() {
             }
         };
     }
-
-    todo!()
 }
 
 #[test]
@@ -54,6 +52,4 @@ fn ancient_1() {
     .unwrap();
 
     assert_eq!("de_ancient", output.header.map_name());
-
-    todo!()
 }

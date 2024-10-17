@@ -1,6 +1,6 @@
 use crate::csgo_proto;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum DemoEvent {
     GameEvent(Box<crate::game_event::GameEvent>),
     ServerInfo(Box<csgo_proto::CsvcMsgServerInfo>),
