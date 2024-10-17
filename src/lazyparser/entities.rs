@@ -1,6 +1,6 @@
 use crate::{
     parser::{
-        decoder, entities, propcontroller, sendtables, update_entity, Class, EntityTickList,
+        decoder, entities, propcontroller, sendtables, update_entity, Class,
         FirstPassError, Paths,
     },
     DemoCommand, FrameIterator,
@@ -62,10 +62,14 @@ impl<'b> LazyEntityIterator<'b> {
     ) -> Result<(), FirstPassError> {
         let mut bitreader = crate::bitreader::Bitreader::new(raw.data());
 
+        let mut msg_bytes = Vec::new();
+
         while bitreader.bits_remaining().unwrap_or(0) > 8 {
             let msg_type = bitreader.read_u_bit_var()?;
             let size = bitreader.read_varint()?;
-            let msg_bytes = bitreader.read_n_bytes(size as usize)?;
+            msg_bytes.clear();
+            msg_bytes.resize(size as usize, 0);
+            bitreader.read_n_bytes_mut(size as usize, &mut msg_bytes)?;
 
             assert_eq!(msg_bytes.len(), size as usize);
 
@@ -252,11 +256,11 @@ impl<'b> Iterator for LazyEntityIterator<'b> {
                             Err(e) => return Some(Err(())),
                         };
 
-                    for table in raw.tables.iter() {
+                    for table in raw.tables.into_iter() {
                         if table.table_name() == "instancebaseline" {
-                            for item in table.items.iter() {
+                            for item in table.items.into_iter() {
                                 let k = item.str().parse::<u32>().unwrap_or(u32::MAX);
-                                self.baselines.insert(k, item.data().to_vec());
+                                self.baselines.insert(k, item.data.unwrap_or(Vec::new()));
                             }
                         }
                     }
