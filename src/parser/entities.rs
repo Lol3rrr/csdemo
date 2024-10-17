@@ -18,7 +18,6 @@ pub struct EntityState {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntityProp {
-    pub field_info: super::sendtables::FieldInfo,
     pub prop_info: super::propcontroller::PropInfo,
     pub value: super::variant::Variant,
 }
@@ -88,7 +87,6 @@ impl EntityContext {
             if let Some(fi) = field_info {
                 if let Some(prop_info) = prop_controller.prop_infos.get(&fi.prop_id) {
                     fields.push(EntityProp {
-                        field_info: fi,
                         prop_info: prop_info.clone(),
                         value: result,
                     });
