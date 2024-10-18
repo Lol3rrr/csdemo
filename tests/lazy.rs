@@ -12,6 +12,8 @@ fn cmp_lazy_nonlazy_events() {
     let lazy_demo =
         csdemo::lazyparser::LazyParser::new(csdemo::Container::parse(&content).unwrap());
 
+    assert_eq!(demo.player_info, lazy_demo.player_info());
+
     for (normal, lazied) in demo
         .events
         .into_iter()
@@ -34,6 +36,8 @@ fn cmp_lazy_nonlazy_entities() {
 
     let lazy_demo =
         csdemo::lazyparser::LazyParser::new(csdemo::Container::parse(&content).unwrap());
+
+    assert_eq!(demo.player_info, lazy_demo.player_info());
 
     let mut normal_iter = demo
         .entity_states

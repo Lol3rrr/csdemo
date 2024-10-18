@@ -39,7 +39,7 @@ impl From<crate::game_event::ParseGameEventError> for FirstPassError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Player {
     pub xuid: u64,
     pub name: String,
